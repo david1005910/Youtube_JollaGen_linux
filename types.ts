@@ -1,4 +1,20 @@
 
+// 참조 이미지 타입 (캐릭터/스타일 분리 + 강도 조절)
+export interface ReferenceImages {
+  character: string[];      // 캐릭터 참조 이미지 (최대 2장) - 캐릭터 외모/스타일 참조
+  style: string[];          // 스타일 참조 이미지 (최대 2장) - 화풍/분위기 참조
+  characterStrength: number; // 캐릭터 참조 강도 (0~100, 기본 70)
+  styleStrength: number;     // 스타일 참조 강도 (0~100, 기본 70)
+}
+
+// 기본 참조 이미지 설정
+export const DEFAULT_REFERENCE_IMAGES: ReferenceImages = {
+  character: [],
+  style: [],
+  characterStrength: 70,
+  styleStrength: 70
+};
+
 export interface SceneAnalysis {
   composition_type: 'MICRO' | 'STANDARD' | 'MACRO';
   composition_explanation: string; // 구도_설명
@@ -123,9 +139,6 @@ export interface ProjectSettings {
 
   // 이미지 모델 설정
   imageModel: string;
-  fluxStyle: string;
-  fluxCustomStyle: string;
-  fluxCharacter: string;
 
   // TTS 설정
   elevenLabsVoiceId: string;
@@ -142,8 +155,6 @@ export interface SavedProject {
   // 설정
   settings: {
     imageModel: string;
-    fluxStyle: string;
-    fluxCharacter: string;
     elevenLabsModel: string;
   };
 

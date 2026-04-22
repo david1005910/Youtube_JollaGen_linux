@@ -1,16 +1,22 @@
+'use client';
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Header from './components/Header';
 import InputSection from './components/InputSection';
 import ResultTable from './components/ResultTable';
-import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown } from './types';
-import { generateScript, findTrendingTopics, generateAudioForScene, generateMotionPrompt } from './services/geminiService';
-import { generateImage, getSelectedImageModel } from './services/imageService';
-import { generateAudioWithElevenLabs } from './services/elevenLabsService';
+import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceImages, DEFAULT_REFERENCE_IMAGES } from './types';
+import {
+  generateScript, generateScriptChunked, findTrendingTopics,
+  generateAudioForScene, generateMotionPrompt,
+  generateImage,
+  generateAudioWithElevenLabs,
+  generateVideoFromImage,
+} from './services/apiClient';
+import { getSelectedImageModel } from './services/imageConfig';
 import { generateVideo, VideoGenerationResult } from './services/videoService';
 import { downloadSrtFromRecorded } from './services/srtService';
-import { generateVideoFromImage, getFalApiKey } from './services/falService';
-import { saveProject, getSavedProjects, deleteProject } from './services/projectService';
+import { getFalApiKey } from './services/falService';
+import { saveProject, getSavedProjects, deleteProject, migrateFromLocalStorage } from './services/projectService';
 import { SavedProject } from './types';
 import { CONFIG, PRICING, formatKRW } from './config';
 import ProjectGallery from './components/ProjectGallery';
@@ -19,6 +25,25 @@ import * as FileSaver from 'file-saver';
 const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+function cleanErrorMessage(error: any): string {
+  const msg: string = error?.message || String(error);
+  if (msg.includes('할당량 초과') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
+    return 'API 할당량 초과. 잠시 후 다시 시도해주세요.';
+  }
+  if (msg.includes('API 키') || msg.includes('permission') || msg.includes('PERMISSION')) {
+    return 'API 키 권한 오류. 설정을 확인해주세요.';
+  }
+  // JSON 문자열이면 파싱해서 message 추출
+  if (msg.startsWith('{') || msg.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(msg);
+      const inner = parsed?.error?.message || parsed?.message || parsed?.detail?.message;
+      return inner ? cleanErrorMessage({ message: inner }) : msg.slice(0, 100);
+    } catch {}
+  }
+  return msg.length > 150 ? msg.slice(0, 150) + '...' : msg;
+}
+
 type ViewMode = 'main' | 'gallery';
 
 const App: React.FC = () => {
@@ -26,7 +51,8 @@ const App: React.FC = () => {
   const [generatedData, setGeneratedData] = useState<GeneratedAsset[]>([]);
   const [progressMessage, setProgressMessage] = useState('');
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
-  const [currentReferenceImages, setCurrentReferenceImages] = useState<string[]>([]);
+  // 참조 이미지 상태 (강도 포함)
+  const [currentReferenceImages, setCurrentReferenceImages] = useState<ReferenceImages>(DEFAULT_REFERENCE_IMAGES);
   const [needsKey, setNeedsKey] = useState(false);
   const [animatingIndices, setAnimatingIndices] = useState<Set<number>>(new Set());
 
@@ -58,14 +84,19 @@ const App: React.FC = () => {
 
   useEffect(() => {
     checkApiKeyStatus();
-    // 저장된 프로젝트 로드
-    setSavedProjects(getSavedProjects());
+    // localStorage → IndexedDB 마이그레이션 및 프로젝트 로드
+    (async () => {
+      await migrateFromLocalStorage(); // 기존 데이터 이전
+      const projects = await getSavedProjects();
+      setSavedProjects(projects);
+    })();
     return () => { isAbortedRef.current = true; };
   }, [checkApiKeyStatus]);
 
   // 프로젝트 목록 새로고침
-  const refreshProjects = useCallback(() => {
-    setSavedProjects(getSavedProjects());
+  const refreshProjects = useCallback(async () => {
+    const projects = await getSavedProjects();
+    setSavedProjects(projects);
   }, []);
 
   const handleOpenKeySelector = async () => {
@@ -117,7 +148,7 @@ const App: React.FC = () => {
 
   const handleGenerate = useCallback(async (
     topic: string,
-    refImgs: string[],
+    refImgs: ReferenceImages,
     sourceText: string | null
   ) => {
     if (isProcessingRef.current) return;
@@ -139,6 +170,10 @@ const App: React.FC = () => {
       setCurrentTopic(topic); // 저장용 토픽 기록
       resetCost(); // 비용 초기화
 
+      // 참조 이미지 존재 여부 계산
+      const hasRefImages = (refImgs.character?.length || 0) + (refImgs.style?.length || 0) > 0;
+      console.log(`[App] 참조 이미지 - 캐릭터: ${refImgs.character?.length || 0}개, 스타일: ${refImgs.style?.length || 0}개`);
+
       let targetTopic = topic;
 
       if (topic === "Manual Script Input" && sourceText) {
@@ -155,7 +190,27 @@ const App: React.FC = () => {
       }
 
       setProgressMessage(`스토리보드 및 메타포 생성 중...`);
-      const scriptScenes = await generateScript(targetTopic, refImgs.length > 0, sourceText);
+
+      // 긴 대본(3000자 초과) 감지 시 청크 분할 처리
+      const inputLength = sourceText?.length || 0;
+      const CHUNK_THRESHOLD = 3000; // 3000자 초과 시 청크 분할
+
+      let scriptScenes: ScriptScene[];
+      if (inputLength > CHUNK_THRESHOLD) {
+        // 긴 대본: 청크 분할 처리 (10,000자 이상 대응)
+        console.log(`[App] 긴 대본 감지: ${inputLength.toLocaleString()}자 → 청크 분할 처리`);
+        setProgressMessage(`긴 대본(${inputLength.toLocaleString()}자) 청크 분할 처리 중...`);
+        scriptScenes = await generateScriptChunked(
+          targetTopic,
+          hasRefImages,
+          sourceText!,
+          2500, // 청크당 2500자
+          setProgressMessage // 진행 상황 콜백
+        );
+      } else {
+        // 일반 대본: 기존 방식
+        scriptScenes = await generateScript(targetTopic, hasRefImages, sourceText);
+      }
       if (isAbortedRef.current) return;
       
       const initialAssets = scriptScenes.map(scene => ({
@@ -166,31 +221,71 @@ const App: React.FC = () => {
       setStep(GenerationStep.ASSETS);
 
       const runAudio = async () => {
+          const TTS_DELAY = 1500; // ElevenLabs API Rate Limit 대응: 1.5초 딜레이
+          const MAX_TTS_RETRIES = 2; // 최대 재시도 횟수
+
           for (let i = 0; i < initialAssets.length; i++) {
               if (isAbortedRef.current) break;
-              try {
-                  // ElevenLabs에서 오디오 + 자막 타임스탬프 동시 획득
-                  const elResult = await generateAudioWithElevenLabs(
-                    assetsRef.current[i].narration
-                  );
+
+              setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 음성 생성 중...`);
+              let success = false;
+
+              // 재시도 로직
+              for (let attempt = 0; attempt <= MAX_TTS_RETRIES && !success; attempt++) {
                   if (isAbortedRef.current) break;
 
-                  if (elResult.audioData) {
-                    // ElevenLabs 성공: 오디오 + 자막 + 길이 데이터 저장
-                    updateAssetAt(i, {
-                      audioData: elResult.audioData,
-                      subtitleData: elResult.subtitleData,
-                      audioDuration: elResult.estimatedDuration
-                    });
-                    // TTS 비용 추가
-                    const charCount = assetsRef.current[i].narration.length;
-                    addCost('tts', charCount * PRICING.TTS.perCharacter, charCount);
-                  } else {
-                    // ElevenLabs 실패 시 Gemini 폴백 (자막 없음)
-                    const fallbackAudio = await generateAudioForScene(assetsRef.current[i].narration);
-                    updateAssetAt(i, { audioData: fallbackAudio });
+                  try {
+                      if (attempt > 0) {
+                          console.log(`[TTS] 씬 ${i + 1} 재시도 중... (${attempt}/${MAX_TTS_RETRIES})`);
+                          await wait(3000); // 재시도 시 3초 대기
+                      }
+
+                      // ElevenLabs에서 오디오 + 자막 타임스탬프 동시 획득
+                      const elResult = await generateAudioWithElevenLabs(
+                        assetsRef.current[i].narration
+                      );
+                      if (isAbortedRef.current) break;
+
+                      if (elResult.audioData) {
+                        // ElevenLabs 성공: 오디오 + 자막 + 길이 데이터 저장
+                        updateAssetAt(i, {
+                          audioData: elResult.audioData,
+                          subtitleData: elResult.subtitleData,
+                          audioDuration: elResult.estimatedDuration
+                        });
+                        // TTS 비용 추가
+                        const charCount = assetsRef.current[i].narration.length;
+                        addCost('tts', charCount * PRICING.TTS.perCharacter, charCount);
+                        success = true;
+                        console.log(`[TTS] 씬 ${i + 1} 음성 생성 완료`);
+                      } else {
+                        throw new Error('ElevenLabs 응답 없음');
+                      }
+                  } catch (e: any) {
+                      console.error(`[TTS] 씬 ${i + 1} 실패 (시도 ${attempt + 1}):`, e.message);
+
+                      // Rate Limit 에러인 경우 더 긴 대기
+                      if (e.message?.includes('429') || e.message?.includes('rate')) {
+                          await wait(5000); // 5초 대기 후 재시도
+                      }
                   }
-              } catch (e) { console.error(e); }
+              }
+
+              // 모든 재시도 실패 시 Gemini 폴백
+              if (!success && !isAbortedRef.current) {
+                  try {
+                      console.log(`[TTS] 씬 ${i + 1} Gemini 폴백 시도...`);
+                      const fallbackAudio = await generateAudioForScene(assetsRef.current[i].narration);
+                      updateAssetAt(i, { audioData: fallbackAudio });
+                  } catch (fallbackError) {
+                      console.error(`[TTS] 씬 ${i + 1} Gemini 폴백도 실패:`, fallbackError);
+                  }
+              }
+
+              // 다음 씬 전에 딜레이 (Rate Limit 방지)
+              if (i < initialAssets.length - 1 && !isAbortedRef.current) {
+                  await wait(TTS_DELAY);
+              }
           }
       };
 
@@ -327,12 +422,115 @@ const App: React.FC = () => {
     } catch (error: any) {
       if (!isAbortedRef.current) {
         setStep(GenerationStep.ERROR);
-        setProgressMessage(`오류: ${error.message}`);
+        setProgressMessage(`❌ ${cleanErrorMessage(error)}`);
       }
     } finally {
       isProcessingRef.current = false;
     }
   }, [checkApiKeyStatus, refreshProjects]);
+
+  // 이미지 재생성 핸들러 (useCallback으로 메모이제이션)
+  const handleRegenerateImage = useCallback(async (idx: number) => {
+    if (isProcessingRef.current) return;
+
+    const MAX_RETRIES = 2;
+    updateAssetAt(idx, { status: 'generating' });
+    setProgressMessage(`씬 ${idx + 1} 이미지 재생성 중...`);
+
+    let success = false;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES && !success; attempt++) {
+      if (isAbortedRef.current) break;
+
+      try {
+        if (attempt > 0) {
+          setProgressMessage(`씬 ${idx + 1} 이미지 재생성 재시도 중... (${attempt}/${MAX_RETRIES})`);
+          await wait(2000);
+        }
+
+        const img = await generateImage(assetsRef.current[idx], currentReferenceImages);
+
+        if (img && !isAbortedRef.current) {
+          updateAssetAt(idx, { imageData: img, status: 'completed' });
+          // 이미지 비용 추가
+          const imageModel = getSelectedImageModel();
+          const imagePrice = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
+          addCost('image', imagePrice, 1);
+          setProgressMessage(`씬 ${idx + 1} 이미지 재생성 완료! (+${formatKRW(imagePrice)})`);
+          success = true;
+        } else if (!img) {
+          throw new Error('이미지 데이터가 비어있습니다');
+        }
+      } catch (e: any) {
+        console.error(`씬 ${idx + 1} 재생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
+
+        if (e.message?.includes("API key not valid") || e.status === 400) {
+          setNeedsKey(true);
+          break;
+        }
+      }
+    }
+
+    if (!success && !isAbortedRef.current) {
+      updateAssetAt(idx, { status: 'error' });
+      setProgressMessage(`씬 ${idx + 1} 이미지 생성 실패. 다시 시도해주세요.`);
+    }
+  }, [currentReferenceImages]);
+
+  // 애니메이션 생성 핸들러 (useCallback으로 메모이제이션)
+  const handleGenerateAnimation = useCallback(async (idx: number) => {
+    const falKey = getFalApiKey();
+    if (!falKey) {
+      alert('FAL API 키를 먼저 등록해주세요.\n설정 패널에서 "FAL.ai 애니메이션 엔진"을 열어 키를 입력하세요.');
+      return;
+    }
+    if (animatingIndices.has(idx)) return; // 이 씬은 이미 변환 중
+    if (!assetsRef.current[idx]?.imageData) {
+      alert('이미지가 먼저 생성되어야 합니다.');
+      return;
+    }
+
+    try {
+      // Set에 현재 인덱스 추가
+      setAnimatingIndices(prev => new Set(prev).add(idx));
+      setProgressMessage(`씬 ${idx + 1} 움직임 분석 중...`);
+
+      // AI가 대본과 이미지를 분석해서 움직임 프롬프트 생성
+      const motionPrompt = await generateMotionPrompt(
+        assetsRef.current[idx].narration,
+        assetsRef.current[idx].visualPrompt
+      );
+
+      setProgressMessage(`씬 ${idx + 1} 영상 변환 중...`);
+      const videoUrl = await generateVideoFromImage(
+        assetsRef.current[idx].imageData!,
+        motionPrompt,
+        falKey
+      );
+
+      if (videoUrl) {
+        updateAssetAt(idx, {
+          videoData: videoUrl,
+          videoDuration: CONFIG.ANIMATION.VIDEO_DURATION
+        });
+        // 영상 비용 추가
+        addCost('video', PRICING.VIDEO.perVideo, 1);
+        setProgressMessage(`씬 ${idx + 1} 영상 변환 완료! (+${formatKRW(PRICING.VIDEO.perVideo)})`);
+      } else {
+        setProgressMessage(`씬 ${idx + 1} 영상 변환 실패`);
+      }
+    } catch (e: any) {
+      console.error('영상 변환 실패:', e);
+      setProgressMessage(`❌ 씬 ${idx + 1} 오류: ${cleanErrorMessage(e)}`);
+    } finally {
+      // Set에서 현재 인덱스 제거
+      setAnimatingIndices(prev => {
+        const next = new Set(prev);
+        next.delete(idx);
+        return next;
+      });
+    }
+  }, [animatingIndices]);
 
   const triggerVideoExport = async (enableSubtitles: boolean = true) => {
     if (isVideoGenerating) return;
@@ -354,16 +552,16 @@ const App: React.FC = () => {
         setProgressMessage(`✨ MP4 렌더링 완료! (${enableSubtitles ? '자막 O' : '자막 X'})`);
       }
     } catch (error: any) {
-      setProgressMessage(`렌더링 실패: ${error.message}`);
+      setProgressMessage(`❌ 렌더링 실패: ${cleanErrorMessage(error)}`);
     } finally {
       setIsVideoGenerating(false);
     }
   };
 
   // 프로젝트 삭제 핸들러
-  const handleDeleteProject = (id: string) => {
-    deleteProject(id);
-    refreshProjects();
+  const handleDeleteProject = async (id: string) => {
+    await deleteProject(id);
+    await refreshProjects();
   };
 
   // 프로젝트 불러오기 핸들러
@@ -455,110 +653,13 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <ResultTable 
-            data={generatedData} 
-            onRegenerateImage={async (idx) => {
-              if (isProcessingRef.current) return;
-              
-              const MAX_RETRIES = 2;
-              updateAssetAt(idx, { status: 'generating' });
-              setProgressMessage(`씬 ${idx + 1} 이미지 재생성 중...`);
-              
-              let success = false;
-              
-              for (let attempt = 0; attempt <= MAX_RETRIES && !success; attempt++) {
-                if (isAbortedRef.current) break;
-                
-                try {
-                  if (attempt > 0) {
-                    setProgressMessage(`씬 ${idx + 1} 이미지 재생성 재시도 중... (${attempt}/${MAX_RETRIES})`);
-                    await wait(2000);
-                  }
-                  
-                  const img = await generateImage(assetsRef.current[idx], currentReferenceImages);
-                  
-                  if (img && !isAbortedRef.current) {
-                    updateAssetAt(idx, { imageData: img, status: 'completed' });
-                    // 이미지 비용 추가
-                    const imageModel = getSelectedImageModel();
-                    const imagePrice = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
-                    addCost('image', imagePrice, 1);
-                    setProgressMessage(`씬 ${idx + 1} 이미지 재생성 완료! (+${formatKRW(imagePrice)})`);
-                    success = true;
-                  } else if (!img) {
-                    throw new Error('이미지 데이터가 비어있습니다');
-                  }
-                } catch (e: any) {
-                  console.error(`씬 ${idx + 1} 재생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
-                  
-                  if (e.message?.includes("API key not valid") || e.status === 400) {
-                    setNeedsKey(true);
-                    break;
-                  }
-                }
-              }
-              
-              if (!success && !isAbortedRef.current) {
-                updateAssetAt(idx, { status: 'error' });
-                setProgressMessage(`씬 ${idx + 1} 이미지 생성 실패. 다시 시도해주세요.`);
-              }
-            }}
+        <ResultTable
+            data={generatedData}
+            onRegenerateImage={handleRegenerateImage}
             onExportVideo={triggerVideoExport}
             isExporting={isVideoGenerating}
             animatingIndices={animatingIndices}
-            onGenerateAnimation={async (idx) => {
-              const falKey = getFalApiKey();
-              if (!falKey) {
-                alert('FAL API 키를 먼저 등록해주세요.\n설정 패널에서 "FAL.ai 애니메이션 엔진"을 열어 키를 입력하세요.');
-                return;
-              }
-              if (animatingIndices.has(idx)) return; // 이 씬은 이미 변환 중
-              if (!assetsRef.current[idx]?.imageData) {
-                alert('이미지가 먼저 생성되어야 합니다.');
-                return;
-              }
-
-              try {
-                // Set에 현재 인덱스 추가
-                setAnimatingIndices(prev => new Set(prev).add(idx));
-                setProgressMessage(`씬 ${idx + 1} 움직임 분석 중... (${animatingIndices.size + 1}개 진행중)`);
-
-                // AI가 대본과 이미지를 분석해서 움직임 프롬프트 생성
-                const motionPrompt = await generateMotionPrompt(
-                  assetsRef.current[idx].narration,
-                  assetsRef.current[idx].visualPrompt
-                );
-
-                setProgressMessage(`씬 ${idx + 1} 영상 변환 중...`);
-                const videoUrl = await generateVideoFromImage(
-                  assetsRef.current[idx].imageData!,
-                  motionPrompt,
-                  falKey
-                );
-
-                if (videoUrl) {
-                  updateAssetAt(idx, {
-                    videoData: videoUrl,
-                    videoDuration: CONFIG.ANIMATION.VIDEO_DURATION
-                  });
-                  // 영상 비용 추가
-                  addCost('video', PRICING.VIDEO.perVideo, 1);
-                  setProgressMessage(`씬 ${idx + 1} 영상 변환 완료! (+${formatKRW(PRICING.VIDEO.perVideo)})`);
-                } else {
-                  setProgressMessage(`씬 ${idx + 1} 영상 변환 실패`);
-                }
-              } catch (e: any) {
-                console.error('영상 변환 실패:', e);
-                setProgressMessage(`씬 ${idx + 1} 오류: ${e.message}`);
-              } finally {
-                // Set에서 현재 인덱스 제거
-                setAnimatingIndices(prev => {
-                  const next = new Set(prev);
-                  next.delete(idx);
-                  return next;
-                });
-              }
-            }}
+            onGenerateAnimation={handleGenerateAnimation}
         />
       </main>
       )}

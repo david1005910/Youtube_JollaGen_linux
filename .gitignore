@@ -10,7 +10,32 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
-*.local
+
+# 환경변수 (API 키 포함 — 절대 커밋 금지)
+.env
+.env.local
+.env.*.local
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# TypeScript
+tsconfig.tsbuildinfo
+
+# AI 도구 설정
+.agent/
+.codex/
+.gemini/
+.opencode/
+.windsurf/
+.claude/
+skills/
+
+# 백업/임시 파일
+*.bak
+vite.config.ts.bak
 
 # Editor directories and files
 .vscode/*

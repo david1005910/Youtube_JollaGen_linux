@@ -1,3 +1,4 @@
+'use client';
 
 import React, { useState } from 'react';
 import { SavedProject } from '../types';
@@ -86,7 +87,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
             </span>
             {selectedProject.settings.imageModel?.includes('flux') && (
               <span className="px-3 py-1 bg-slate-800 rounded-full text-slate-300">
-                {selectedProject.settings.fluxStyle}
+                {(selectedProject.settings as any).fluxStyle}
               </span>
             )}
             <span className="px-3 py-1 bg-slate-800 rounded-full text-slate-300">
@@ -266,7 +267,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                 {/* 모델 정보 */}
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {/* 이미지 모델 */}
-                  {project.settings.imageModel?.includes('flux') ? (
+                  {project.settings?.imageModel?.includes('flux') ? (
                     <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-[10px] font-bold rounded">
                       Flux
                     </span>
@@ -277,9 +278,9 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                   )}
 
                   {/* Flux 화풍 (Flux일 때만) */}
-                  {project.settings.imageModel?.includes('flux') && project.settings.fluxStyle && (
+                  {project.settings?.imageModel?.includes('flux') && (project.settings as any).fluxStyle && (
                     <span className="px-2 py-0.5 bg-slate-700 text-slate-300 text-[10px] rounded">
-                      {project.settings.fluxStyle === 'custom' ? '커스텀' : project.settings.fluxStyle}
+                      {(project.settings as any).fluxStyle === 'custom' ? '커스텀' : (project.settings as any).fluxStyle}
                     </span>
                   )}
 

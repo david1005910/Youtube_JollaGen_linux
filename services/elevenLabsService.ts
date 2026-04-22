@@ -10,11 +10,16 @@ import { splitSubtitleByMeaning } from "./geminiService";
 
 const OUTPUT_FORMAT = "mp3_44100_128";
 
+const safeLS = {
+  getItem: (key: string) => (typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null),
+  setItem: (key: string, value: string) => { if (typeof localStorage !== 'undefined') localStorage.setItem(key, value); },
+};
+
 /**
  * 저장된 ElevenLabs 모델 ID 가져오기
  */
 export const getElevenLabsModelId = (): ElevenLabsModelId => {
-  const saved = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_MODEL);
+  const saved = safeLS.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_MODEL);
   return (saved as ElevenLabsModelId) || CONFIG.DEFAULT_ELEVENLABS_MODEL;
 };
 
@@ -22,7 +27,7 @@ export const getElevenLabsModelId = (): ElevenLabsModelId => {
  * ElevenLabs 모델 ID 저장
  */
 export const setElevenLabsModelId = (modelId: ElevenLabsModelId): void => {
-  localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_MODEL, modelId);
+  safeLS.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_MODEL, modelId);
 };
 
 export interface ElevenLabsResult {
@@ -143,8 +148,8 @@ export const generateAudioWithElevenLabs = async (
   providedModelId?: ElevenLabsModelId
 ): Promise<ElevenLabsResult> => {
 
-  const savedApiKey = process.env.ELEVENLABS_API_KEY || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY);
-  const savedVoiceId = process.env.ELEVENLABS_VOICE_ID || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID);
+  const savedApiKey = process.env.ELEVENLABS_API_KEY || safeLS.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY);
+  const savedVoiceId = process.env.ELEVENLABS_VOICE_ID || safeLS.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID);
 
   const finalKey = providedApiKey || savedApiKey;
   const finalVoiceId = providedVoiceId || savedVoiceId || CONFIG.DEFAULT_VOICE_ID;
@@ -261,7 +266,9 @@ export interface ElevenLabsVoice {
  * ElevenLabs에서 사용 가능한 음성 목록 가져오기
  */
 export const fetchElevenLabsVoices = async (apiKey?: string): Promise<ElevenLabsVoice[]> => {
-  const finalKey = apiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY);
+  // 환경변수 우선, 그 다음 localStorage
+  const envKey = process.env.ELEVENLABS_API_KEY;
+  const finalKey = apiKey || envKey || safeLS.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY);
 
   if (!finalKey || finalKey.length < 10) {
     console.warn("ElevenLabs API Key가 설정되지 않았습니다.");

@@ -435,7 +435,7 @@ export const generateVideo = async (
         const source = audioCtx.createBufferSource();
         source.buffer = scene.audioBuffer;
         source.connect(destination);
-        source.connect(audioCtx.destination);
+        // 렌더링 중 스피커 출력 음소거 (MP4에는 정상 포함)
         source.start(masterStartTime + scene.startTime);
         source.stop(masterStartTime + scene.endTime);
       }
