@@ -15,11 +15,11 @@ import {
 import { getSelectedImageModel } from './services/imageConfig';
 import { generateVideo, VideoGenerationResult } from './services/videoService';
 import { downloadSrtFromRecorded } from './services/srtService';
-import { getFalApiKey } from './services/falService';
 import { saveProject, getSavedProjects, deleteProject, migrateFromLocalStorage } from './services/projectService';
 import { SavedProject } from './types';
 import { CONFIG, PRICING, formatKRW } from './config';
 import ProjectGallery from './components/ProjectGallery';
+import YouTubeSkillChat from './components/YouTubeSkillChat';
 import * as FileSaver from 'file-saver';
 
 const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
@@ -46,6 +46,7 @@ function cleanErrorMessage(error: any): string {
 
 type ViewMode = 'main' | 'gallery';
 
+
 const App: React.FC = () => {
   const [step, setStep] = useState<GenerationStep>(GenerationStep.IDLE);
   const [generatedData, setGeneratedData] = useState<GeneratedAsset[]>([]);
@@ -60,6 +61,7 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('main');
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [currentTopic, setCurrentTopic] = useState<string>('');
+  const [showYoutubeSkills, setShowYoutubeSkills] = useState(false);
 
   // 비용 추적
   const [currentCost, setCurrentCost] = useState<CostBreakdown | null>(null);
@@ -290,7 +292,8 @@ const App: React.FC = () => {
       };
 
       const runImages = async () => {
-          const MAX_RETRIES = 2; // 최대 재시도 횟수
+          const MAX_RETRIES = 2;
+          const IMAGE_DELAY = 6000; // Gemini 이미지 RPM 제한 대응: 씬 간 6초 딜레이
           const imageModel = getSelectedImageModel();
           const imagePrice = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
 
@@ -301,58 +304,59 @@ const App: React.FC = () => {
               let success = false;
               let lastError: any = null;
 
-              // 재시도 로직 (최초 시도 + 재시도)
               for (let attempt = 0; attempt <= MAX_RETRIES && !success; attempt++) {
                   if (isAbortedRef.current) break;
 
                   try {
                       if (attempt > 0) {
                           setProgressMessage(`씬 ${i + 1} 이미지 재생성 시도 중... (${attempt}/${MAX_RETRIES})`);
-                          await wait(2000); // 재시도 전 대기
+                          await wait(10000); // 재시도 시 10초 대기 (할당량 회복)
                       }
 
-                      // Scene 객체 전체를 넘겨서 prompts.ts가 분석 정보를 활용하도록 함
                       const img = await generateImage(assetsRef.current[i], refImgs);
                       if (isAbortedRef.current) break;
 
                       if (img) {
                           updateAssetAt(i, { imageData: img, status: 'completed' });
-                          // 이미지 비용 추가
                           addCost('image', imagePrice, 1);
                           success = true;
                       } else {
                           throw new Error('이미지 데이터가 비어있습니다');
                       }
-                  } catch (e: any) { 
+                  } catch (e: any) {
                       lastError = e;
                       console.error(`씬 ${i + 1} 이미지 생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
-                      
+
                       // API 키 오류는 재시도하지 않음
                       if (e.message?.includes("API key not valid") || e.status === 400) {
                           setNeedsKey(true);
                           break;
                       }
+
+                      // 할당량 초과 시 추가 대기
+                      const isQuota = e.message?.includes('할당량') || e.message?.includes('quota') ||
+                        e.message?.includes('RESOURCE_EXHAUSTED') || e.message?.includes('429');
+                      if (isQuota && attempt < MAX_RETRIES) {
+                          setProgressMessage(`씬 ${i + 1} API 할당량 초과 — ${15}초 대기 후 재시도...`);
+                          await wait(15000);
+                      }
                   }
               }
-              
-              // 모든 시도 실패 시 에러 상태로 설정
+
               if (!success && !isAbortedRef.current) {
                   updateAssetAt(i, { status: 'error' });
                   console.error(`씬 ${i + 1} 이미지 생성 최종 실패:`, lastError?.message);
               }
-              
-              await wait(50);
+
+              // 다음 씬 전에 딜레이 (Gemini 이미지 RPM 제한 방지)
+              if (i < initialAssets.length - 1 && !isAbortedRef.current) {
+                  await wait(IMAGE_DELAY);
+              }
           }
       };
 
       // 앞 N개 씬을 애니메이션으로 변환하는 함수
       const runAnimations = async () => {
-        const falApiKey = getFalApiKey();
-        if (!falApiKey) {
-          console.log('[Animation] FAL API 키 없음, 애니메이션 변환 건너뜀');
-          return;
-        }
-
         const animationCount = Math.min(CONFIG.ANIMATION.ENABLED_SCENES, initialAssets.length);
         setProgressMessage(`앞 ${animationCount}개 씬 애니메이션 변환 중...`);
 
@@ -373,8 +377,7 @@ const App: React.FC = () => {
 
             const videoUrl = await generateVideoFromImage(
               assetsRef.current[i].imageData!,
-              motionPrompt,
-              falApiKey
+              motionPrompt
             );
 
             if (videoUrl && !isAbortedRef.current) {
@@ -479,11 +482,6 @@ const App: React.FC = () => {
 
   // 애니메이션 생성 핸들러 (useCallback으로 메모이제이션)
   const handleGenerateAnimation = useCallback(async (idx: number) => {
-    const falKey = getFalApiKey();
-    if (!falKey) {
-      alert('FAL API 키를 먼저 등록해주세요.\n설정 패널에서 "FAL.ai 애니메이션 엔진"을 열어 키를 입력하세요.');
-      return;
-    }
     if (animatingIndices.has(idx)) return; // 이 씬은 이미 변환 중
     if (!assetsRef.current[idx]?.imageData) {
       alert('이미지가 먼저 생성되어야 합니다.');
@@ -504,8 +502,7 @@ const App: React.FC = () => {
       setProgressMessage(`씬 ${idx + 1} 영상 변환 중...`);
       const videoUrl = await generateVideoFromImage(
         assetsRef.current[idx].imageData!,
-        motionPrompt,
-        falKey
+        motionPrompt
       );
 
       if (videoUrl) {
@@ -575,51 +572,157 @@ const App: React.FC = () => {
     setViewMode('main'); // 메인 뷰로 전환
   };
 
+  /* ── Gooey / Liquid Morphism shared style helpers ─────────────────────── */
+  const gooBlob = (top: string, left: string, right: string, bottom: string,
+                   w: number, h: number, color: string, radius?: string) => ({
+    position: 'absolute' as const, top, left, right, bottom,
+    width: w, height: h, pointerEvents: 'none' as const,
+    background: `radial-gradient(circle, ${color} 0%, transparent 70%)`,
+    borderRadius: radius || '50%',
+    filter: 'blur(48px)',
+  });
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div
+      className="min-h-screen text-white"
+      style={{
+        background: 'linear-gradient(135deg, #f97316 0%, #ec4899 35%, #8b5cf6 65%, #3b82f6 100%)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* SVG Gooey filter — makes overlapping blobs merge like liquid */}
+      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+        <filter id="goo">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+          <feColorMatrix in="blur" mode="matrix"
+            values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
+        </filter>
+      </svg>
+
+      {/* Decorative background blobs */}
+      <div style={gooBlob('-80px', '-80px', 'auto', 'auto', 320, 320, 'rgba(249,115,22,0.55)')} />
+      <div style={gooBlob('15%', 'auto', '-60px', 'auto', 260, 260, 'rgba(139,92,246,0.5)')} />
+      <div style={gooBlob('auto', '28%', 'auto', '6%', 220, 220, 'rgba(236,72,153,0.45)', '60% 40% 30% 70% / 60% 30% 70% 40%')} />
+      <div style={gooBlob('45%', '-40px', 'auto', 'auto', 180, 180, 'rgba(59,130,246,0.4)', '40% 60% 70% 30% / 40% 50% 60% 50%')} />
+      <div style={gooBlob('70%', 'auto', '10%', 'auto', 150, 150, 'rgba(249,115,22,0.35)')} />
+
       <Header />
 
+      {/* YouTube Skill Studio 모달 */}
+      {showYoutubeSkills && (
+        <YouTubeSkillChat onClose={() => setShowYoutubeSkills(false)} />
+      )}
+
       {/* 네비게이션 탭 */}
-      <div className="border-b border-slate-800">
+      <div style={{
+        borderBottom: '1px solid rgba(255,255,255,0.18)',
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 100%)',
+        backdropFilter: 'blur(14px)',
+        position: 'relative', zIndex: 10,
+      }}>
+        {/* glossy top-edge highlight */}
+        <div style={{ height: 1, background: 'linear-gradient(90deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1), rgba(255,255,255,0.5))' }} />
         <div className="max-w-7xl mx-auto px-4 flex items-center gap-1">
           <button
             onClick={() => setViewMode('main')}
-            className={`px-4 py-3 text-sm font-bold transition-colors relative ${
-              viewMode === 'main'
-                ? 'text-brand-400'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
+            style={{
+              padding: '12px 16px', fontSize: 14, fontWeight: 700,
+              background: 'none', border: 'none', cursor: 'pointer',
+              position: 'relative', transition: 'all 0.2s',
+              color: viewMode === 'main' ? '#fff' : 'rgba(255,255,255,0.55)',
+              textShadow: '0px 2px 4px rgba(0,0,0,0.3)',
+            }}
           >
             스토리보드 생성
             {viewMode === 'main' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0, height: 3,
+                background: 'linear-gradient(90deg, rgba(255,255,255,0.9), rgba(255,255,255,0.3))',
+                borderRadius: '3px 3px 0 0',
+                boxShadow: '0 0 8px rgba(255,255,255,0.5)',
+              }} />
             )}
           </button>
+
           <button
             onClick={() => setViewMode('gallery')}
-            className={`px-4 py-3 text-sm font-bold transition-colors relative flex items-center gap-2 ${
-              viewMode === 'gallery'
-                ? 'text-brand-400'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
+            style={{
+              padding: '12px 16px', fontSize: 14, fontWeight: 700,
+              background: 'none', border: 'none', cursor: 'pointer',
+              position: 'relative', display: 'flex', alignItems: 'center', gap: 8,
+              transition: 'all 0.2s',
+              color: viewMode === 'gallery' ? '#fff' : 'rgba(255,255,255,0.55)',
+              textShadow: '0px 2px 4px rgba(0,0,0,0.3)',
+            }}
           >
             저장된 프로젝트
             {savedProjects.length > 0 && (
-              <span className="px-1.5 py-0.5 bg-slate-700 text-xs rounded-full">
+              <span style={{
+                padding: '2px 8px', borderRadius: 20, fontSize: 11,
+                background: 'rgba(255,255,255,0.25)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.2)',
+              }}>
                 {savedProjects.length}
               </span>
             )}
             {viewMode === 'gallery' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0, height: 3,
+                background: 'linear-gradient(90deg, rgba(255,255,255,0.9), rgba(255,255,255,0.3))',
+                borderRadius: '3px 3px 0 0',
+                boxShadow: '0 0 8px rgba(255,255,255,0.5)',
+              }} />
             )}
+          </button>
+
+          {/* YouTube Skill Studio 버튼 */}
+          <button
+            onClick={() => setShowYoutubeSkills(true)}
+            style={{
+              marginLeft: 'auto', marginRight: 4, marginTop: 6, marginBottom: 6,
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 20px', borderRadius: 24,
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.45)',
+              color: '#fff', fontSize: 14, fontWeight: 700,
+              boxShadow: '0 6px 20px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.4)',
+              textShadow: '0px 2px 4px rgba(0,0,0,0.35)',
+              cursor: 'pointer', transition: 'all 0.2s',
+            }}
+          >
+            <span style={{ fontSize: 16 }}>▶</span>
+            YouTube 스킬
           </button>
         </div>
       </div>
 
       {needsKey && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 py-2 px-4 flex items-center justify-center gap-4 animate-in fade-in slide-in-from-top-4">
-          <span className="text-amber-400 text-xs font-bold">Gemini 3 Pro 엔진을 위해 API 키 설정이 필요합니다.</span>
-          <button onClick={handleOpenKeySelector} className="px-3 py-1 bg-amber-500 text-slate-950 text-[10px] font-black rounded-lg hover:bg-amber-400 transition-colors uppercase">API 키 설정</button>
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(245,158,11,0.35) 0%, rgba(245,158,11,0.15) 100%)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid rgba(245,158,11,0.3)',
+          padding: '10px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
+          position: 'relative', zIndex: 10,
+        }}>
+          <span style={{ color: '#fcd34d', fontSize: 13, fontWeight: 700, textShadow: '0 2px 4px rgba(0,0,0,0.35)' }}>
+            Gemini 3 Pro 엔진을 위해 API 키 설정이 필요합니다.
+          </span>
+          <button
+            onClick={handleOpenKeySelector}
+            style={{
+              padding: '4px 14px', borderRadius: 14,
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              color: '#1c1917', fontSize: 10, fontWeight: 900,
+              border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 2,
+              boxShadow: '0 4px 14px rgba(245,158,11,0.45)',
+            }}
+          >
+            API 키 설정
+          </button>
         </div>
       )}
 
@@ -636,33 +739,72 @@ const App: React.FC = () => {
 
       {/* 메인 뷰 */}
       {viewMode === 'main' && (
-      <main className="py-8">
-        <InputSection onGenerate={handleGenerate} step={step} />
-        
-        {step !== GenerationStep.IDLE && (
-          <div className="max-w-7xl mx-auto px-4 text-center mb-12">
-             <div className="inline-flex items-center gap-4 px-6 py-3 rounded-2xl border bg-slate-900 border-slate-800 shadow-2xl">
-                {step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS ? (
-                  <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent animate-spin rounded-full"></div>
-                ) : <div className={`w-2 h-2 rounded-full ${step === GenerationStep.ERROR ? 'bg-red-500' : 'bg-green-500'}`}></div>}
-                <span className="text-sm font-bold text-slate-300">{progressMessage}</span>
-                {(step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS) && (
-                  <button onClick={handleAbort} className="ml-2 px-3 py-1 rounded-lg bg-red-600/20 text-red-500 text-[10px] font-black uppercase tracking-widest border border-red-500/30">Stop</button>
-                )}
-             </div>
-          </div>
-        )}
+        <main style={{ paddingTop: 32, paddingBottom: 48, position: 'relative', zIndex: 1 }}>
+          <InputSection onGenerate={handleGenerate} step={step} />
 
-        <ResultTable
+          {step !== GenerationStep.IDLE && (
+            <div style={{ maxWidth: 1280, margin: '0 auto 48px', padding: '0 16px', textAlign: 'center' }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 16,
+                padding: '12px 28px', borderRadius: 32,
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 100%)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 12px 32px rgba(0,0,0,0.18), inset 0 1px 2px rgba(255,255,255,0.35)',
+              }}>
+                {step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS ? (
+                  <div style={{
+                    width: 16, height: 16,
+                    border: '2.5px solid rgba(255,255,255,0.9)',
+                    borderTopColor: 'transparent',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite',
+                  }} />
+                ) : (
+                  <div style={{
+                    width: 10, height: 10, borderRadius: '50%',
+                    background: step === GenerationStep.ERROR
+                      ? 'radial-gradient(circle, #ff6b6b, #ef4444)'
+                      : 'radial-gradient(circle, #86efac, #22c55e)',
+                    boxShadow: step === GenerationStep.ERROR
+                      ? '0 0 10px rgba(239,68,68,0.7)'
+                      : '0 0 10px rgba(34,197,94,0.7)',
+                  }} />
+                )}
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                  {progressMessage}
+                </span>
+                {(step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS) && (
+                  <button
+                    onClick={handleAbort}
+                    style={{
+                      marginLeft: 8, padding: '4px 14px', borderRadius: 14,
+                      background: 'rgba(239,68,68,0.25)',
+                      border: '1px solid rgba(239,68,68,0.5)',
+                      color: '#fca5a5', fontSize: 10, fontWeight: 900,
+                      cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 3,
+                      backdropFilter: 'blur(4px)',
+                    }}
+                  >
+                    Stop
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          <ResultTable
             data={generatedData}
             onRegenerateImage={handleRegenerateImage}
             onExportVideo={triggerVideoExport}
             isExporting={isVideoGenerating}
             animatingIndices={animatingIndices}
             onGenerateAnimation={handleGenerateAnimation}
-        />
-      </main>
+          />
+        </main>
       )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

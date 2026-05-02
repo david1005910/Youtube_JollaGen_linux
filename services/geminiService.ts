@@ -213,7 +213,9 @@ const retryGeminiRequest = async <T>(
     } catch (error: any) {
       lastError = error;
       const errorMsg = error.message || JSON.stringify(error);
-      const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || error.status === 429;
+      const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') ||
+        errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('quota') ||
+        errorMsg.includes('rate') || error.status === 429 || error.status === 503;
       if (isQuotaError && attempt < maxRetries) {
         await wait(baseDelay * attempt);
         continue;
@@ -643,7 +645,7 @@ Ensure the entire image consistently follows this visual style.`
           if (part.inlineData) return part.inlineData.data;
         }
         return null;
-      }, 2, 3000); // 각 대체어당 2회 재시도
+      }, 3, 8000); // 할당량 초과 시 8초 기본 대기, 최대 3회 재시도
 
       if (result) return result;
     } catch (error: any) {

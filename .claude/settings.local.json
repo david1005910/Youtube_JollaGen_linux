@@ -3,9 +3,14 @@
     "allow": [
       "Bash(npx tsc:*)",
       "Bash(ls:*)",
-      "Bash(npm run dev)",
-      "Bash(npm run build:*)",
-      "WebSearch"
+      "Bash(npm run *)",
+      "Bash(npm install*)",
+      "WebSearch",
+      "Bash(find:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(git config *)",
+      "Bash(git commit -m ' *)",
+      "Skill(update-config)"
     ]
   }
 }
