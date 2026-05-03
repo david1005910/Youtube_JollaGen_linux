@@ -27,7 +27,11 @@ async function generateWithFalElevenLabs(
 
     if (!response.ok) {
       const err = await response.text();
-      console.warn('[FAL ElevenLabs] TTS 오류:', err.slice(0, 200));
+      if (err.includes('Exhausted balance') || err.includes('locked')) {
+        console.warn('[FAL ElevenLabs] 잔액 부족 — fal.ai 대시보드에서 충전 필요');
+      } else {
+        console.warn('[FAL ElevenLabs] TTS 오류:', err.slice(0, 200));
+      }
       return { audioData: null, subtitleData: null, estimatedDuration: null };
     }
 

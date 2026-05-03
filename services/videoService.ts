@@ -269,7 +269,7 @@ export const generateVideo = async (
     await new Promise<void>((resolve, reject) => {
       img.onload = () => {
         if (img.width === 0 || img.height === 0) {
-          console.error(`[Video] 씬 ${i + 1}: 이미지 크기가 0 - 로드 실패`);
+          console.warn(`[Video] 씬 ${i + 1}: 이미지 크기가 0 - 로드 실패`);
           reject(new Error('Image has zero dimensions'));
         } else {
           console.log(`[Video] 씬 ${i + 1}: 이미지 로드 완료 (${img.width}x${img.height})`);
@@ -277,7 +277,7 @@ export const generateVideo = async (
         }
       };
       img.onerror = () => {
-        console.error(`[Video] 씬 ${i + 1}: 이미지 로드 에러`);
+        console.warn(`[Video] 씬 ${i + 1}: 이미지 로드 에러`);
         reject(new Error('Image load failed'));
       };
       // 타임아웃 (5초)

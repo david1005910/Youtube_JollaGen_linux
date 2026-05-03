@@ -187,8 +187,12 @@ export const generateAudioWithElevenLabs = async (
     if (!response.ok) {
       const errorDetail = await response.text();
       console.warn("ElevenLabs API Error:", errorDetail);
-      // 유료 플랜 필요 에러 → 즉시 Gemini TTS로 전환 (재시도 불필요)
+      // 유료 보이스 에러 → 기본 무료 보이스(Rachel)로 자동 전환 후 재시도
       if (errorDetail.includes('paid_plan_required') || errorDetail.includes('payment_required')) {
+        if (finalVoiceId !== CONFIG.DEFAULT_VOICE_ID) {
+          console.warn(`[ElevenLabs] 유료 보이스(${finalVoiceId}) → 기본 무료 보이스(Rachel)로 자동 전환`);
+          return generateAudioWithElevenLabs(text, providedApiKey, CONFIG.DEFAULT_VOICE_ID, providedModelId);
+        }
         console.warn('[ElevenLabs] 유료 보이스 감지 → Gemini TTS로 즉시 전환');
         return { audioData: null, subtitleData: null, estimatedDuration: null, skipRetry: true };
       }
