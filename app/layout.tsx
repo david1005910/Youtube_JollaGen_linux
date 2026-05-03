@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           ::-webkit-scrollbar-thumb:hover { background: #64748b; }
         `}</style>
       </head>
-      <body className="bg-slate-950 text-slate-200 antialiased min-h-screen">
+      <body className="bg-slate-950 text-slate-200 antialiased min-h-screen" suppressHydrationWarning>
         {children}
       </body>
     </html>

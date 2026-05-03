@@ -23,14 +23,15 @@ function readEnvFile(): Record<string, string> {
 
 function writeEnvFile(vars: Record<string, string>) {
   try {
-    const content = fs.readFileSync(ENV_FILE, 'utf-8');
+    let content = '';
+    try { content = fs.readFileSync(ENV_FILE, 'utf-8'); } catch {}
     let updated = content;
     for (const [key, value] of Object.entries(vars)) {
       const regex = new RegExp(`^(${key}=).*$`, 'm');
       if (regex.test(updated)) {
         updated = updated.replace(regex, `$1${value}`);
       } else {
-        updated += `\n${key}=${value}`;
+        updated += (updated.endsWith('\n') || !updated ? '' : '\n') + `${key}=${value}\n`;
       }
     }
     fs.writeFileSync(ENV_FILE, updated);
@@ -39,50 +40,55 @@ function writeEnvFile(vars: Record<string, string>) {
   }
 }
 
+function maskKey(key: string) {
+  if (key.length <= 8) return '****';
+  return key.slice(0, 6) + '****' + key.slice(-4);
+}
+
 // GET: 현재 키 설정 상태 (값은 마스킹)
 export async function GET() {
   const env = readEnvFile();
+  const anthropicKey = env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '';
+  const geminiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
   return Response.json({
-    hasGeminiKey:     Boolean(env.GEMINI_API_KEY),
-    hasPaidKey:       Boolean(env.GEMINI_API_KEY_PAID),
-    geminiKeyMasked:  env.GEMINI_API_KEY  ? maskKey(env.GEMINI_API_KEY)  : '',
-    paidKeyMasked:    env.GEMINI_API_KEY_PAID ? maskKey(env.GEMINI_API_KEY_PAID) : '',
+    hasAnthropicKey:    Boolean(anthropicKey),
+    anthropicKeyMasked: anthropicKey ? maskKey(anthropicKey) : '',
+    hasGeminiKey:       Boolean(geminiKey),
+    geminiKeyMasked:    geminiKey ? maskKey(geminiKey) : '',
   });
 }
 
-// POST: 유료 키 저장
+// POST: API 키 저장 (즉시 반영)
 export async function POST(req: NextRequest) {
   try {
-    const { paidKey } = await req.json();
-    if (!paidKey || typeof paidKey !== 'string') {
-      return Response.json({ error: '유효한 키가 필요합니다.' }, { status: 400 });
+    const body = await req.json();
+    const updates: Record<string, string> = {};
+
+    if (body.anthropicKey !== undefined) {
+      const key = String(body.anthropicKey).trim();
+      if (key && !key.startsWith('sk-ant-')) {
+        return Response.json({ error: 'Anthropic 키는 "sk-ant-"로 시작해야 합니다.' }, { status: 400 });
+      }
+      updates.ANTHROPIC_API_KEY = key;
+      process.env.ANTHROPIC_API_KEY = key;
     }
-    if (!paidKey.startsWith('AIza')) {
-      return Response.json({ error: 'Gemini API 키는 "AIza"로 시작해야 합니다.' }, { status: 400 });
+
+    if (body.geminiKey !== undefined) {
+      const key = String(body.geminiKey).trim();
+      if (key && !key.startsWith('AIza')) {
+        return Response.json({ error: 'Gemini API 키는 "AIza"로 시작해야 합니다.' }, { status: 400 });
+      }
+      updates.GEMINI_API_KEY = key;
+      process.env.GEMINI_API_KEY = key;
     }
-    writeEnvFile({ GEMINI_API_KEY_PAID: paidKey });
 
-    // 프로세스 환경변수도 즉시 반영 (재시작 없이 적용)
-    process.env.GEMINI_API_KEY_PAID = paidKey;
+    if (Object.keys(updates).length === 0) {
+      return Response.json({ error: '저장할 키가 없습니다.' }, { status: 400 });
+    }
 
-    return Response.json({ ok: true, masked: maskKey(paidKey) });
-  } catch (e: any) {
-    return Response.json({ error: e.message }, { status: 500 });
-  }
-}
-
-// DELETE: 유료 키 제거
-export async function DELETE() {
-  try {
-    writeEnvFile({ GEMINI_API_KEY_PAID: '' });
-    process.env.GEMINI_API_KEY_PAID = '';
+    writeEnvFile(updates);
     return Response.json({ ok: true });
   } catch (e: any) {
     return Response.json({ error: e.message }, { status: 500 });
   }
-}
-
-function maskKey(key: string) {
-  if (key.length <= 8) return '****';
-  return key.slice(0, 6) + '****' + key.slice(-4);
 }

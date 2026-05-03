@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ScriptScene } from './types';
 import YouTubeSkillChat from './components/YouTubeSkillChat';
 import YouTubeClipperChat from './components/YouTubeClipperChat';
+import { RemotionPreview, type UploadedMedia } from './components/RemotionPreview';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Message {
@@ -36,10 +37,10 @@ function renderContent(text: string) {
       const code = part.replace(/```\w*\n?/, '').replace(/```$/, '');
       return (
         <pre key={i} style={{
-          background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 10, padding: '12px 14px', margin: '8px 0',
-          fontSize: 12, color: '#a5f3fc', overflowX: 'auto', whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
+          background: '#1a1815', border: '1px solid rgba(255,255,255,0.10)',
+          borderRadius: 10, padding: '12px 14px', margin: '10px 0',
+          fontSize: 13, color: '#c8b8a2', overflowX: 'auto', whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word', fontFamily: 'monospace',
         }}>
           <code>{code}</code>
         </pre>
@@ -53,7 +54,7 @@ function renderContent(text: string) {
             <React.Fragment key={j}>
               {chunks.map((chunk, k) =>
                 k % 2 === 1
-                  ? <strong key={k} style={{ color: '#e0e7ff' }}>{chunk}</strong>
+                  ? <strong key={k} style={{ color: '#f0e8de', fontWeight: 600 }}>{chunk}</strong>
                   : <span key={k}>{chunk}</span>
               )}
               {j < arr.length - 1 && <br />}
@@ -108,56 +109,41 @@ function SceneTable({ scenes }: { scenes: ScriptScene[] }) {
 
   return (
     <div style={{
-      marginTop: 12, marginLeft: 40,
-      background: 'rgba(139,92,246,0.06)',
-      border: '1px solid rgba(139,92,246,0.22)',
-      borderRadius: 16, overflow: 'hidden',
+      marginTop: 14,
+      background: '#252220',
+      border: '1px solid rgba(255,255,255,0.09)',
+      borderRadius: 14, overflow: 'hidden',
     }}>
-      {/* 헤더 */}
       <div style={{
-        padding: '11px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'rgba(139,92,246,0.14)', borderBottom: '1px solid rgba(139,92,246,0.18)',
+        padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: '#2a2724', borderBottom: '1px solid rgba(255,255,255,0.07)',
         flexWrap: 'wrap', gap: 8,
       }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: '#c4b5fd' }}>
+        <span style={{ fontWeight: 600, fontSize: 13, color: '#c8b8a2' }}>
           📋 스크립트 {scenes.length}씬
         </span>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button
-            onClick={() => setShowVisual(v => !v)}
-            style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.70)', cursor: 'pointer' }}
-          >{showVisual ? '프롬프트 숨기기' : '프롬프트 보기'}</button>
-          <button
-            onClick={copyScript}
-            style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer' }}
-          >{copied ? '✓ 복사됨' : '복사'}</button>
-          <button
-            onClick={exportTxt}
-            style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer' }}
-          >TXT</button>
-          <button
-            onClick={exportSrt}
-            style={{ padding: '4px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600, background: 'rgba(139,92,246,0.28)', border: '1px solid rgba(139,92,246,0.38)', color: '#c4b5fd', cursor: 'pointer' }}
-          >SRT 저장</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => setShowVisual(v => !v)} style={btnStyle}>{showVisual ? '프롬프트 숨기기' : '프롬프트 보기'}</button>
+          <button onClick={copyScript} style={btnStyle}>{copied ? '✓ 복사됨' : '복사'}</button>
+          <button onClick={exportTxt} style={btnStyle}>TXT</button>
+          <button onClick={exportSrt} style={{ ...btnStyle, background: 'rgba(217,117,89,0.18)', border: '1px solid rgba(217,117,89,0.35)', color: '#e09070' }}>SRT 저장</button>
         </div>
       </div>
-
-      {/* 씬 목록 */}
       <div style={{ maxHeight: 420, overflowY: 'auto' }}>
         {scenes.map(scene => (
           <div key={scene.sceneNumber} style={{
             padding: '10px 16px', display: 'grid', gridTemplateColumns: '34px 1fr', gap: 12,
-            borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'start',
+            borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'start',
           }}>
             <span style={{
-              width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-              background: 'rgba(139,92,246,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 12, fontWeight: 700, color: '#a78bfa',
+              width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+              background: 'rgba(217,117,89,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 700, color: '#d97559',
             }}>{scene.sceneNumber}</span>
             <div>
-              <div style={{ fontSize: 14, color: '#f1f5f9', lineHeight: 1.65 }}>{scene.narration}</div>
+              <div style={{ fontSize: 14, color: '#e0d5ca', lineHeight: 1.7 }}>{scene.narration}</div>
               {showVisual && scene.visualPrompt && (
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 4, fontStyle: 'italic' }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 5, fontStyle: 'italic', lineHeight: 1.5 }}>
                   {scene.visualPrompt}
                 </div>
               )}
@@ -169,7 +155,13 @@ function SceneTable({ scenes }: { scenes: ScriptScene[] }) {
   );
 }
 
-// ─── Welcome message ─────────────────────────────────────────────────────────
+const btnStyle: React.CSSProperties = {
+  padding: '4px 10px', borderRadius: 7, fontSize: 11,
+  background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+  color: 'rgba(255,255,255,0.60)', cursor: 'pointer',
+};
+
+// ─── Welcome ─────────────────────────────────────────────────────────────────
 const WELCOME = `안녕하세요! YouTube 스크립트 & 자막 생성 AI입니다.
 
 원하는 주제를 입력하면 씬별 자막과 이미지 프롬프트를 바로 생성해 드립니다.
@@ -180,6 +172,19 @@ const WELCOME = `안녕하세요! YouTube 스크립트 & 자막 생성 AI입니�
 • "AI가 바꾸는 미래 — 나레이션 8개 씬"
 • "삼성전자 실적 발표 뉴스 영상 자막"`;
 
+// ─── Claude-style Avatar ─────────────────────────────────────────────────────
+function ClaudeAvatar() {
+  return (
+    <div style={{
+      width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+      background: '#c96442',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: '-0.5px',
+      marginTop: 2,
+    }}>C</div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [messages, setMessages] = useState<Message[]>([
@@ -187,14 +192,79 @@ export default function App() {
   ]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [aiModel, setAiModel] = useState<'claude' | 'gemini'>('claude');
   const [showYoutubeSkills, setShowYoutubeSkills] = useState(false);
   const [showClipper, setShowClipper] = useState(false);
+  const [showMedia, setShowMedia] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [uploadedMedia, setUploadedMedia] = useState<UploadedMedia>({ images: [], video: null });
+  const [secPerScene, setSecPerScene] = useState(5);
+  const [showPlayer, setShowPlayer] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const [settingsAnthropicKey, setSettingsAnthropicKey] = useState('');
+  const [settingsGeminiKey, setSettingsGeminiKey] = useState('');
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMsg, setSettingsMsg] = useState('');
+  const [keyStatus, setKeyStatus] = useState<{ anthropicKeyMasked?: string; geminiKeyMasked?: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const openSettings = async () => {
+    setSettingsAnthropicKey('');
+    setSettingsGeminiKey('');
+    setSettingsMsg('');
+    setShowSettings(true);
+    try {
+      const res = await fetch('/api/settings/apikey');
+      const data = await res.json();
+      setKeyStatus(data);
+    } catch {}
+  };
+
+  const saveSettings = async () => {
+    setSettingsSaving(true);
+    setSettingsMsg('');
+    try {
+      const body: Record<string, string> = {};
+      if (settingsAnthropicKey.trim()) body.anthropicKey = settingsAnthropicKey.trim();
+      if (settingsGeminiKey.trim()) body.geminiKey = settingsGeminiKey.trim();
+      if (Object.keys(body).length === 0) { setSettingsMsg('변경할 키를 입력하세요.'); return; }
+      const res = await fetch('/api/settings/apikey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setSettingsMsg('✅ 저장 완료! 즉시 적용됩니다.');
+        setSettingsAnthropicKey('');
+        setSettingsGeminiKey('');
+        const res2 = await fetch('/api/settings/apikey');
+        setKeyStatus(await res2.json());
+      } else {
+        setSettingsMsg(`❌ ${data.error}`);
+      }
+    } catch (e: any) {
+      setSettingsMsg(`❌ ${e.message}`);
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem('tubegen_ai_model') as 'claude' | 'gemini' | null;
+    if (saved === 'claude' || saved === 'gemini') setAiModel(saved);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const switchModel = (model: 'claude' | 'gemini') => {
+    setAiModel(model);
+    localStorage.setItem('tubegen_ai_model', model);
+  };
 
   const sendMessage = useCallback(async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
@@ -212,7 +282,7 @@ export default function App() {
       const res = await fetch('/api/gemini/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({ messages: newMessages, preferredModel: aiModel }),
       });
       if (!res.ok) throw new Error(`API 오류: ${res.status}`);
 
@@ -265,125 +335,397 @@ export default function App() {
     }
   }, [input, isStreaming, messages]);
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    Promise.all(files.map(f => new Promise<{ src: string; name: string }>(resolve => {
+      const reader = new FileReader();
+      reader.onload = ev => resolve({ src: ev.target!.result as string, name: f.name });
+      reader.readAsDataURL(f);
+    }))).then(imgs => {
+      setUploadedMedia(prev => ({ ...prev, images: [...prev.images, ...imgs] }));
+    });
+    e.target.value = '';
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      setUploadedMedia(prev => ({ ...prev, video: { src: ev.target!.result as string, name: file.name } }));
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const removeImage = (idx: number) => {
+    setUploadedMedia(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
+  };
+
   const clearChat = () => {
     setMessages([{ role: 'assistant', content: WELCOME }]);
     setInput('');
   };
 
+  const modelLabel = aiModel === 'claude' ? 'Claude Sonnet 4.6' : 'Gemini 2.0 Flash';
+
+  // 채팅에서 가장 최근 생성된 씬 목록
+  const latestScenes = [...messages].reverse().find(m => m.scenes && m.scenes.length > 0)?.scenes ?? [];
+  const hasMedia = uploadedMedia.images.length > 0 || uploadedMedia.video !== null;
+  const canPreview = hasMedia && latestScenes.length > 0;
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100vh',
-      background: 'linear-gradient(160deg, #0f0720 0%, #0a0f2e 55%, #0f0720 100%)',
-      color: '#fff', fontFamily: "'Noto Sans KR', system-ui, sans-serif",
+      background: '#1c1917',
+      color: '#e0d5ca',
+      fontFamily: "'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     }}>
+
       {/* ── 헤더 ── */}
       <div style={{
-        padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10,
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        background: 'rgba(0,0,0,0.22)', flexShrink: 0,
+        flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', height: 52,
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        background: '#1c1917',
       }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: 'linear-gradient(135deg,#8B5CF6,#06B6D4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
-        }}>✨</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-0.3px' }}>TubeGen AI</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.40)', marginTop: 1 }}>
-            YouTube 스크립트 & 자막 생성
-          </div>
+        {/* 왼쪽: 로고 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: '50%',
+            background: '#c96442',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 700, color: '#fff',
+          }}>T</div>
+          <span style={{ fontWeight: 700, fontSize: 14, color: '#e0d5ca', letterSpacing: '-0.2px' }}>TubeGen AI</span>
         </div>
 
-        {/* YouTube 전문가 툴 버튼 */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {/* 가운데: 모델명 */}
+        <div style={{
+          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
           <button
-            onClick={() => setShowYoutubeSkills(true)}
+            onClick={() => switchModel(aiModel === 'claude' ? 'gemini' : 'claude')}
             style={{
-              padding: '7px 14px', borderRadius: 9, fontSize: 12, fontWeight: 600,
-              background: 'linear-gradient(135deg,rgba(239,68,68,0.25),rgba(220,38,38,0.15))',
-              border: '1px solid rgba(239,68,68,0.40)',
-              color: '#fca5a5', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-              transition: 'all 0.2s',
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
+              color: '#c8b8a2', cursor: 'pointer',
             }}
           >
-            📺 YouTube 전문가
+            <span style={{
+              width: 7, height: 7, borderRadius: '50%',
+              background: aiModel === 'claude' ? '#c96442' : '#4285F4',
+              display: 'inline-block', flexShrink: 0,
+            }} />
+            {modelLabel}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
           </button>
-          <button
-            onClick={() => setShowClipper(true)}
-            style={{
-              padding: '7px 14px', borderRadius: 9, fontSize: 12, fontWeight: 600,
-              background: 'linear-gradient(135deg,rgba(234,179,8,0.22),rgba(202,138,4,0.12))',
-              border: '1px solid rgba(234,179,8,0.35)',
-              color: '#fde68a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-              transition: 'all 0.2s',
-            }}
-          >
-            ✂️ 영상 클리퍼
+        </div>
+
+        {/* 오른쪽: 툴 버튼들 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button onClick={() => { setShowMedia(true); setShowPlayer(false); }} style={{
+            ...headerBtnStyle('#22c55e', 'rgba(34,197,94,0.10)'),
+            position: 'relative',
+          }}>
+            🎬
+            {hasMedia && (
+              <span style={{
+                position: 'absolute', top: -3, right: -3, width: 8, height: 8,
+                borderRadius: '50%', background: '#22c55e', border: '1.5px solid #1c1917',
+              }} />
+            )}
           </button>
-          <button
-            onClick={clearChat}
-            style={{
-              padding: '7px 12px', borderRadius: 9, fontSize: 12,
-              background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)',
-              color: 'rgba(255,255,255,0.55)', cursor: 'pointer',
-            }}
-          >새 대화</button>
+          <button onClick={() => setShowYoutubeSkills(true)} style={headerBtnStyle('#ef4444', 'rgba(239,68,68,0.12)')}>
+            📺
+          </button>
+          <button onClick={() => setShowClipper(true)} style={headerBtnStyle('#eab308', 'rgba(234,179,8,0.10)')}>
+            ✂️
+          </button>
+          <button onClick={clearChat} style={{
+            padding: '5px 11px', borderRadius: 7, fontSize: 12,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
+            color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
+          }}>새 대화</button>
+          <button onClick={openSettings} style={{
+            width: 30, height: 30, borderRadius: 7, fontSize: 14,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
+            color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }} title="API 키 설정">⚙️</button>
         </div>
       </div>
 
-      {/* ── YouTube 전문가 모달 ── */}
-      {showYoutubeSkills && (
-        <YouTubeSkillChat onClose={() => setShowYoutubeSkills(false)} />
+      {/* ── 모달들 ── */}
+      {showYoutubeSkills && <YouTubeSkillChat onClose={() => setShowYoutubeSkills(false)} />}
+      {showClipper && <YouTubeClipperChat onClose={() => setShowClipper(false)} />}
+
+      {/* ── 설정 모달 ── */}
+      {showSettings && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9000,
+          background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setShowSettings(false)}>
+          <div style={{
+            background: '#252220', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 16, padding: 28, width: 440, maxWidth: '92vw',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 22, color: '#e0d5ca' }}>API 키 설정</div>
+
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 7, display: 'flex', justifyContent: 'space-between' }}>
+                <span>Claude (Anthropic) API Key</span>
+                {keyStatus?.anthropicKeyMasked && <span style={{ color: '#c96442' }}>현재: {keyStatus.anthropicKeyMasked}</span>}
+              </div>
+              <input type="password" placeholder="sk-ant-api03-..." value={settingsAnthropicKey}
+                onChange={e => setSettingsAnthropicKey(e.target.value)}
+                style={{ width: '100%', padding: '10px 13px', borderRadius: 9, fontSize: 13, background: '#1c1917', border: '1px solid rgba(255,255,255,0.12)', color: '#e0d5ca', outline: 'none', boxSizing: 'border-box' }} />
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 4 }}>console.anthropic.com에서 발급 · 크레딧 충전 필요</div>
+            </div>
+
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 7, display: 'flex', justifyContent: 'space-between' }}>
+                <span>Gemini (Google) API Key</span>
+                {keyStatus?.geminiKeyMasked && <span style={{ color: '#4285F4' }}>현재: {keyStatus.geminiKeyMasked}</span>}
+              </div>
+              <input type="password" placeholder="AIzaSy..." value={settingsGeminiKey}
+                onChange={e => setSettingsGeminiKey(e.target.value)}
+                style={{ width: '100%', padding: '10px 13px', borderRadius: 9, fontSize: 13, background: '#1c1917', border: '1px solid rgba(255,255,255,0.12)', color: '#e0d5ca', outline: 'none', boxSizing: 'border-box' }} />
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 4 }}>aistudio.google.com에서 발급 · 무료 티어 제공</div>
+            </div>
+
+            {settingsMsg && (
+              <div style={{ fontSize: 13, marginBottom: 14, color: settingsMsg.startsWith('✅') ? '#86efac' : '#fca5a5' }}>
+                {settingsMsg}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={saveSettings} disabled={settingsSaving} style={{
+                flex: 1, padding: '10px 0', borderRadius: 9, fontSize: 14, fontWeight: 600,
+                background: '#c96442', border: 'none', color: '#fff', cursor: 'pointer', opacity: settingsSaving ? 0.6 : 1,
+              }}>{settingsSaving ? '저장 중...' : '저장'}</button>
+              <button onClick={() => setShowSettings(false)} style={{
+                padding: '10px 18px', borderRadius: 9, fontSize: 14,
+                background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+                color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
+              }}>닫기</button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* ── 영상 클리퍼 모달 ── */}
-      {showClipper && (
-        <YouTubeClipperChat onClose={() => setShowClipper(false)} />
+      {/* ── 미디어 & Remotion 프리뷰 모달 ── */}
+      {showMedia && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9100,
+          background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16,
+        }} onClick={() => setShowMedia(false)}>
+          <div style={{
+            background: '#1e1c19', border: '1px solid rgba(255,255,255,0.10)',
+            borderRadius: 18, width: '100%', maxWidth: 860, maxHeight: '90vh',
+            overflow: 'auto', boxShadow: '0 30px 80px rgba(0,0,0,0.7)',
+          }} onClick={e => e.stopPropagation()}>
+
+            {/* 모달 헤더 */}
+            <div style={{
+              padding: '16px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+            }}>
+              <span style={{ fontWeight: 700, fontSize: 15, color: '#e0d5ca' }}>🎬 미디어 업로드 & 프리뷰</span>
+              <button onClick={() => setShowMedia(false)} style={{
+                background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer', padding: '0 4px',
+              }}>×</button>
+            </div>
+
+            <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* 씬 정보 */}
+              {latestScenes.length > 0 ? (
+                <div style={{
+                  padding: '10px 14px', borderRadius: 10, background: 'rgba(34,197,94,0.08)',
+                  border: '1px solid rgba(34,197,94,0.20)', fontSize: 13, color: '#86efac',
+                }}>
+                  ✅ 채팅에서 생성된 스크립트 {latestScenes.length}씬이 감지됐습니다.
+                  이미지를 씬 순서대로 업로드하거나 영상을 업로드하세요.
+                </div>
+              ) : (
+                <div style={{
+                  padding: '10px 14px', borderRadius: 10, background: 'rgba(255,200,0,0.08)',
+                  border: '1px solid rgba(255,200,0,0.18)', fontSize: 13, color: '#fcd34d',
+                }}>
+                  ⚠️ 먼저 채팅에서 스크립트를 생성하면 자막이 자동으로 추가됩니다.
+                </div>
+              )}
+
+              {/* 이미지 업로드 */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#c8b8a2', marginBottom: 10 }}>
+                  이미지 업로드
+                  {latestScenes.length > 0 && (
+                    <span style={{ fontWeight: 400, fontSize: 11, color: 'rgba(255,255,255,0.35)', marginLeft: 8 }}>
+                      씬 순서대로 업로드 권장 ({uploadedMedia.images.length}/{latestScenes.length}장)
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' }}>
+                  {/* 업로드된 이미지 썸네일 */}
+                  {uploadedMedia.images.map((img, idx) => (
+                    <div key={idx} style={{ position: 'relative' }}>
+                      <img src={img.src} alt={img.name} style={{
+                        width: 90, height: 60, objectFit: 'cover', borderRadius: 8,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                      }} />
+                      <div style={{
+                        position: 'absolute', bottom: 2, left: 2,
+                        background: 'rgba(0,0,0,0.7)', color: '#fff',
+                        fontSize: 10, padding: '1px 5px', borderRadius: 4,
+                      }}>씬 {idx + 1}</div>
+                      <button onClick={() => removeImage(idx)} style={{
+                        position: 'absolute', top: -5, right: -5, width: 18, height: 18,
+                        borderRadius: '50%', background: '#c96442', border: 'none',
+                        color: '#fff', fontSize: 11, cursor: 'pointer', lineHeight: '18px', padding: 0,
+                      }}>×</button>
+                    </div>
+                  ))}
+                  {/* 추가 버튼 */}
+                  <button onClick={() => imageInputRef.current?.click()} style={{
+                    width: 90, height: 60, borderRadius: 8, fontSize: 22,
+                    background: 'rgba(255,255,255,0.05)', border: '1.5px dashed rgba(255,255,255,0.18)',
+                    color: 'rgba(255,255,255,0.35)', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>+</button>
+                </div>
+                <input ref={imageInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleImageUpload} />
+              </div>
+
+              {/* 영상 업로드 */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#c8b8a2', marginBottom: 10 }}>영상 업로드</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button onClick={() => videoInputRef.current?.click()} style={{
+                    padding: '9px 18px', borderRadius: 9, fontSize: 13,
+                    background: uploadedMedia.video ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${uploadedMedia.video ? 'rgba(34,197,94,0.30)' : 'rgba(255,255,255,0.12)'}`,
+                    color: uploadedMedia.video ? '#86efac' : 'rgba(255,255,255,0.55)', cursor: 'pointer',
+                  }}>
+                    {uploadedMedia.video ? `✅ ${uploadedMedia.video.name}` : '+ 영상 파일 선택 (mp4, webm, mov)'}
+                  </button>
+                  {uploadedMedia.video && (
+                    <button onClick={() => setUploadedMedia(prev => ({ ...prev, video: null }))} style={{
+                      padding: '5px 10px', borderRadius: 7, fontSize: 12,
+                      background: 'rgba(201,100,66,0.15)', border: '1px solid rgba(201,100,66,0.25)',
+                      color: '#e09070', cursor: 'pointer',
+                    }}>제거</button>
+                  )}
+                </div>
+                <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" style={{ display: 'none' }} onChange={handleVideoUpload} />
+              </div>
+
+              {/* 씬당 시간 설정 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 13, color: '#c8b8a2', flexShrink: 0 }}>씬당 재생 시간</span>
+                <input
+                  type="range" min={2} max={15} step={1} value={secPerScene}
+                  onChange={e => setSecPerScene(Number(e.target.value))}
+                  style={{ flex: 1, accentColor: '#c96442' }}
+                />
+                <span style={{ fontSize: 13, color: '#e0d5ca', flexShrink: 0, minWidth: 36, textAlign: 'right' }}>{secPerScene}초</span>
+              </div>
+
+              {/* 프리뷰 버튼 */}
+              {hasMedia && (
+                <button
+                  onClick={() => setShowPlayer(p => !p)}
+                  style={{
+                    padding: '12px 0', borderRadius: 10, fontSize: 14, fontWeight: 700,
+                    background: canPreview ? '#c96442' : '#2a2724',
+                    border: canPreview ? 'none' : '1px solid rgba(255,255,255,0.10)',
+                    color: canPreview ? '#fff' : 'rgba(255,255,255,0.35)', cursor: 'pointer',
+                  }}
+                >
+                  {showPlayer ? '▲ 프리뷰 숨기기' : '▶ Remotion 프리뷰'}
+                  {!canPreview && <span style={{ fontSize: 11, marginLeft: 8 }}>(스크립트 생성 후 사용 가능)</span>}
+                </button>
+              )}
+
+              {/* Remotion Player */}
+              {showPlayer && canPreview && (
+                <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <RemotionPreview
+                    scenes={latestScenes}
+                    media={uploadedMedia}
+                    secPerScene={secPerScene}
+                  />
+                  <div style={{
+                    padding: '10px 14px', background: '#161412', fontSize: 12, color: 'rgba(255,255,255,0.35)',
+                    display: 'flex', gap: 16,
+                  }}>
+                    <span>씬 {latestScenes.length}개</span>
+                    <span>총 {latestScenes.length * secPerScene}초</span>
+                    <span>이미지 {uploadedMedia.images.length}장</span>
+                    {uploadedMedia.video && <span>영상: {uploadedMedia.video.name}</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── 채팅 영역 ── */}
       <div style={{
-        flex: 1, overflowY: 'auto', padding: '24px 16px',
-        display: 'flex', flexDirection: 'column', gap: 20,
+        flex: 1, overflowY: 'auto', padding: '32px 0 24px',
       }}>
-        <div style={{ maxWidth: 860, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ maxWidth: 720, width: '100%', margin: '0 auto', padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 28 }}>
           {messages.map((msg, i) => (
             <div key={i}>
-              {/* 말풍선 */}
-              <div style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                {msg.role === 'assistant' && (
+              {msg.role === 'user' ? (
+                /* ── 사용자 메시지 ── */
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <div style={{
-                    width: 30, height: 30, borderRadius: 9, flexShrink: 0,
-                    background: 'linear-gradient(135deg,#8B5CF6,#06B6D4)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 14, marginRight: 10, marginTop: 3,
-                  }}>✨</div>
-                )}
-                <div style={{
-                  maxWidth: '82%',
-                  padding: '13px 17px',
-                  borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
-                  background: msg.role === 'user'
-                    ? 'linear-gradient(135deg,rgba(139,92,246,0.78),rgba(59,130,246,0.68))'
-                    : 'rgba(255,255,255,0.07)',
-                  border: msg.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.10)',
-                  color: '#fff', fontSize: 14, lineHeight: 1.70,
-                }}>
-                  {msg.role === 'assistant' ? renderContent(msg.content) : msg.content}
-                  {msg.role === 'assistant' && i === messages.length - 1 && isStreaming && (
-                    <span style={{
-                      display: 'inline-block', width: 7, height: 14,
-                      background: 'rgba(139,92,246,0.85)',
-                      marginLeft: 2, verticalAlign: 'text-bottom',
-                      animation: 'cur 0.75s steps(1) infinite',
-                    }} />
-                  )}
+                    maxWidth: '80%',
+                    padding: '12px 18px',
+                    borderRadius: '18px 18px 4px 18px',
+                    background: '#2e2b28',
+                    color: '#e0d5ca', fontSize: 14, lineHeight: 1.7,
+                    border: '1px solid rgba(255,255,255,0.08)',
+                  }}>
+                    {msg.content}
+                  </div>
                 </div>
-              </div>
-
-              {/* 씬 테이블 (JSON 파싱된 경우) */}
-              {msg.scenes && msg.scenes.length > 0 && (
-                <SceneTable scenes={msg.scenes} />
+              ) : (
+                /* ── AI 응답 ── */
+                <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                  <ClaudeAvatar />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#c8b8a2', marginBottom: 8 }}>
+                      {aiModel === 'claude' ? 'Claude' : 'Gemini'}
+                    </div>
+                    <div style={{ fontSize: 14.5, lineHeight: 1.78, color: '#d8cfc5' }}>
+                      {renderContent(msg.content)}
+                      {i === messages.length - 1 && isStreaming && (
+                        <span style={{
+                          display: 'inline-block', width: 2, height: 16,
+                          background: '#c96442',
+                          marginLeft: 2, verticalAlign: 'text-bottom',
+                          animation: 'cur 0.75s steps(1) infinite',
+                        }} />
+                      )}
+                    </div>
+                    {msg.scenes && msg.scenes.length > 0 && (
+                      <SceneTable scenes={msg.scenes} />
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           ))}
@@ -392,12 +734,16 @@ export default function App() {
       </div>
 
       {/* ── 입력 영역 ── */}
-      <div style={{
-        flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.08)',
-        background: 'rgba(0,0,0,0.28)', padding: '16px',
-      }}>
-        <div style={{ maxWidth: 860, margin: '0 auto' }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+      <div style={{ flexShrink: 0, padding: '0 24px 24px' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
+          <div style={{
+            background: '#2a2724',
+            border: '1px solid rgba(255,255,255,0.10)',
+            borderRadius: 16,
+            padding: '4px 4px 4px 16px',
+            display: 'flex', flexDirection: 'column',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+          }}>
             <textarea
               ref={inputRef}
               value={input}
@@ -409,48 +755,83 @@ export default function App() {
                 }
               }}
               disabled={isStreaming}
-              placeholder="주제를 입력하세요. (예: 코로나 사태, 비트코인 전망, AI 미래)  Enter로 전송 / Shift+Enter 줄바꿈"
+              placeholder="주제를 입력하세요.  (Enter 전송 / Shift+Enter 줄바꿈)"
               rows={2}
               style={{
-                flex: 1, padding: '13px 16px', borderRadius: 14, fontSize: 14,
-                background: 'rgba(255,255,255,0.07)',
-                border: '1px solid rgba(255,255,255,0.18)',
-                color: '#fff', outline: 'none', resize: 'none',
-                lineHeight: 1.55,
+                width: '100%', border: 'none', outline: 'none', resize: 'none',
+                background: 'transparent',
+                color: '#e0d5ca', fontSize: 14.5, lineHeight: 1.65,
+                padding: '10px 0 6px', fontFamily: 'inherit',
               }}
             />
-            <button
-              onClick={() => sendMessage()}
-              disabled={isStreaming || !input.trim()}
-              style={{
-                padding: '0 22px', height: 52, borderRadius: 14, flexShrink: 0,
-                background: isStreaming || !input.trim()
-                  ? 'rgba(255,255,255,0.07)'
-                  : 'linear-gradient(135deg,#8B5CF6,#06B6D4)',
-                border: 'none',
-                cursor: isStreaming || !input.trim() ? 'default' : 'pointer',
-                color: isStreaming || !input.trim() ? 'rgba(255,255,255,0.35)' : '#fff',
-                fontWeight: 700, fontSize: 15,
-                boxShadow: isStreaming || !input.trim() ? 'none' : '0 4px 18px rgba(139,92,246,0.45)',
-                transition: 'all 0.2s',
-              }}
-            >
-              {isStreaming ? '생성 중...' : '시작'}
-            </button>
+            {/* 하단 바 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 2 }}>
+              {/* 모델 토글 */}
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  onClick={() => switchModel('claude')}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6, fontSize: 11.5, fontWeight: 500,
+                    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                    background: aiModel === 'claude' ? 'rgba(201,100,66,0.22)' : 'transparent',
+                    color: aiModel === 'claude' ? '#e09070' : 'rgba(255,255,255,0.35)',
+                  }}
+                >Claude</button>
+                <button
+                  onClick={() => switchModel('gemini')}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6, fontSize: 11.5, fontWeight: 500,
+                    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                    background: aiModel === 'gemini' ? 'rgba(66,133,244,0.20)' : 'transparent',
+                    color: aiModel === 'gemini' ? '#80a8f0' : 'rgba(255,255,255,0.35)',
+                  }}
+                >Gemini</button>
+              </div>
+
+              {/* 전송 버튼 */}
+              <button
+                onClick={() => sendMessage()}
+                disabled={isStreaming || !input.trim()}
+                style={{
+                  width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                  background: isStreaming || !input.trim() ? 'rgba(255,255,255,0.08)' : '#c96442',
+                  border: 'none',
+                  cursor: isStreaming || !input.trim() ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {isStreaming ? (
+                  <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                ) : (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={input.trim() ? '#fff' : 'rgba(255,255,255,0.25)'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="19" x2="12" y2="5" />
+                    <polyline points="5 12 12 5 19 12" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
-          <p style={{ margin: '8px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.28)', textAlign: 'center' }}>
-            Powered by Claude Sonnet · Gemini Flash — 스크립트 JSON 감지 시 씬 테이블 자동 표시
-          </p>
         </div>
       </div>
 
       <style>{`
         @keyframes cur { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.35); border-radius: 10px; }
-        textarea::placeholder { color: rgba(255,255,255,0.28); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 10px; }
+        textarea::placeholder { color: rgba(255,255,255,0.22); }
+        button { font-family: inherit; }
       `}</style>
     </div>
   );
+}
+
+function headerBtnStyle(color: string, bg: string): React.CSSProperties {
+  return {
+    width: 30, height: 30, borderRadius: 7, fontSize: 14,
+    background: bg, border: `1px solid ${color}30`,
+    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  };
 }

@@ -94,9 +94,21 @@ async function streamGeminiFallback(
   controller.enqueue(enc.encode(`data: ${JSON.stringify({ error: 'Claude 크레딧 부족 + Gemini 할당량 초과. console.anthropic.com에서 충전하세요.' })}\n\n`));
 }
 
+// Gemini용 대화 히스토리 → contents 변환
+function buildGeminiContents(messages: { role: string; content: string }[], system: string) {
+  // 히스토리가 있으면 대화 이어가기, 없으면 시스템+마지막 메시지
+  if (messages.length <= 1) {
+    return `${system}\n\n${messages[0]?.content ?? ''}`;
+  }
+  const history = messages
+    .map(m => `${m.role === 'user' ? '사용자' : 'AI'}: ${m.content}`)
+    .join('\n\n');
+  return `${system}\n\n대화 내역:\n${history}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json();
+    const { messages, preferredModel = 'claude' } = await req.json();
     if (!Array.isArray(messages) || messages.length === 0) {
       return new Response(JSON.stringify({ error: 'Invalid request' }), { status: 400 });
     }
@@ -121,11 +133,46 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         const enc = new TextEncoder();
 
-        // Claude 사용 가능 여부 확인
+        // ── Gemini 우선 선택 ──
+        if (preferredModel === 'gemini') {
+          console.log('[Chat] Gemini 모드 선택');
+          const geminiKey = process.env.GEMINI_API_KEY;
+          if (!geminiKey) {
+            controller.enqueue(enc.encode(`data: ${JSON.stringify({ error: 'GEMINI_API_KEY가 설정되지 않았습니다.' })}\n\n`));
+            controller.close();
+            return;
+          }
+          const gemini = new GoogleGenAI({ apiKey: geminiKey });
+          const geminiContents = buildGeminiContents(claudeMessages, SYSTEM_INSTRUCTION);
+          for (const model of GEMINI_CHAT_MODELS) {
+            try {
+              const stream = await gemini.models.generateContentStream({ model, contents: geminiContents });
+              for await (const chunk of stream) {
+                const text = chunk.text;
+                if (text) controller.enqueue(enc.encode(`data: ${JSON.stringify({ text })}\n\n`));
+              }
+              controller.enqueue(enc.encode('data: [DONE]\n\n'));
+              controller.close();
+              return;
+            } catch (e: any) {
+              const msg = e?.message ?? '';
+              const skip = msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') ||
+                           msg.includes('429') || msg.includes('not found') || msg.includes('not supported') || msg.includes('UNAVAILABLE');
+              if (skip) { console.warn(`[Gemini] ${model} 실패 → 다음 모델`); continue; }
+              controller.enqueue(enc.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
+              controller.close();
+              return;
+            }
+          }
+          controller.enqueue(enc.encode(`data: ${JSON.stringify({ error: 'Gemini 할당량 초과. 잠시 후 다시 시도하세요.' })}\n\n`));
+          controller.close();
+          return;
+        }
+
+        // ── Claude 전용 (폴백 없음) ──
         const anthropicKey = process.env.ANTHROPIC_API_KEY;
         if (!anthropicKey) {
-          console.warn('[Chat] ANTHROPIC_API_KEY 없음 → Gemini 폴백');
-          await streamGeminiFallback(controller, enc, lastUserMsg);
+          controller.enqueue(enc.encode(`data: ${JSON.stringify({ error: 'ANTHROPIC_API_KEY가 설정되지 않았습니다.' })}\n\n`));
           controller.close();
           return;
         }
@@ -151,8 +198,7 @@ export async function POST(req: NextRequest) {
           controller.enqueue(enc.encode('data: [DONE]\n\n'));
         } catch (err: any) {
           if (isQuotaOrCreditsError(err)) {
-            console.warn('[Chat] Claude 크레딧 부족 → Gemini 폴백');
-            await streamGeminiFallback(controller, enc, lastUserMsg);
+            controller.enqueue(enc.encode(`data: ${JSON.stringify({ error: 'Claude 크레딧이 부족합니다. console.anthropic.com에서 충전하세요.' })}\n\n`));
           } else {
             controller.enqueue(enc.encode(`data: ${JSON.stringify({ error: err.message })}\n\n`));
           }
