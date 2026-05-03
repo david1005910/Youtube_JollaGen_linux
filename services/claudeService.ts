@@ -1,23 +1,55 @@
 /**
  * Anthropic Claude API 서비스 (서버 사이드 전용)
  * - 스크립트/프롬프트 생성, 트렌드 검색, 자막 분리, 모션 프롬프트
+ * - Claude 크레딧 부족 시 Gemini Flash로 자동 폴백
  * - 이미지/TTS는 지원 안 됨 → geminiService 사용
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
 import { ScriptScene } from '../types';
 import { SYSTEM_INSTRUCTIONS, getTrendSearchPrompt, getScriptGenerationPrompt } from './prompts';
 
 const FAST_MODEL  = 'claude-haiku-4-5-20251001';  // 빠른 작업 (트렌드, 자막, 모션)
 const SMART_MODEL = 'claude-sonnet-4-6';           // 스크립트 생성
+const GEMINI_FALLBACK = 'gemini-2.5-flash';        // Claude 크레딧 부족 시 폴백
 
 let _client: Anthropic | null = null;
+let _gemini: GoogleGenAI | null = null;
 
 function getClient(): Anthropic {
   if (!_client) {
     _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
   }
   return _client;
+}
+
+function getGemini(): GoogleGenAI | null {
+  if (!process.env.GEMINI_API_KEY) return null;
+  if (!_gemini) _gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return _gemini;
+}
+
+function isClaudeCreditsError(err: any): boolean {
+  const msg: string = err?.message ?? '';
+  const status: number = err?.status ?? 0;
+  return (
+    msg.includes('credit balance') ||
+    msg.includes('insufficient_quota') ||
+    msg.includes('billing') ||
+    (status === 400 && msg.includes('invalid_request_error'))
+  );
+}
+
+async function callGeminiFallback(system: string, userPrompt: string): Promise<string> {
+  const ai = getGemini();
+  if (!ai) throw new Error('Gemini API key not set — Claude 크레딧을 충전하거나 GEMINI_API_KEY를 설정하세요');
+  console.warn('[Claude→Gemini 폴백] Claude 크레딧 부족 — Gemini Flash로 전환');
+  const response = await ai.models.generateContent({
+    model: GEMINI_FALLBACK,
+    contents: `${system}\n\n${userPrompt}`,
+  });
+  return response.text ?? '';
 }
 
 function cleanJsonResponse(text: string): string {
@@ -54,13 +86,20 @@ async function callClaude(
   model: string = SMART_MODEL,
   maxTokens: number = 8192
 ): Promise<string> {
-  const msg = await getClient().messages.create({
-    model,
-    max_tokens: maxTokens,
-    system,
-    messages: [{ role: 'user', content: userPrompt }],
-  });
-  return msg.content[0].type === 'text' ? msg.content[0].text : '';
+  try {
+    const msg = await getClient().messages.create({
+      model,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: 'user', content: userPrompt }],
+    });
+    return msg.content[0].type === 'text' ? msg.content[0].text : '';
+  } catch (err: any) {
+    if (isClaudeCreditsError(err)) {
+      return callGeminiFallback(system, userPrompt);
+    }
+    throw err;
+  }
 }
 
 // ── 트렌드 검색 ────────────────────────────────────────────────────────────
