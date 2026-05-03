@@ -2,6 +2,8 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ScriptScene } from './types';
+import YouTubeSkillChat from './components/YouTubeSkillChat';
+import YouTubeClipperChat from './components/YouTubeClipperChat';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Message {
@@ -185,6 +187,8 @@ export default function App() {
   ]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [showYoutubeSkills, setShowYoutubeSkills] = useState(false);
+  const [showClipper, setShowClipper] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -274,30 +278,68 @@ export default function App() {
     }}>
       {/* ── 헤더 ── */}
       <div style={{
-        padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 12,
+        padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10,
         borderBottom: '1px solid rgba(255,255,255,0.08)',
         background: 'rgba(0,0,0,0.22)', flexShrink: 0,
       }}>
         <div style={{
-          width: 38, height: 38, borderRadius: 11,
+          width: 36, height: 36, borderRadius: 10,
           background: 'linear-gradient(135deg,#8B5CF6,#06B6D4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
         }}>✨</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.3px' }}>TubeGen AI</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', marginTop: 1 }}>
+          <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-0.3px' }}>TubeGen AI</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.40)', marginTop: 1 }}>
             YouTube 스크립트 & 자막 생성
           </div>
         </div>
-        <button
-          onClick={clearChat}
-          style={{
-            padding: '7px 14px', borderRadius: 9, fontSize: 12,
-            background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)',
-            color: 'rgba(255,255,255,0.60)', cursor: 'pointer',
-          }}
-        >새 대화</button>
+
+        {/* YouTube 전문가 툴 버튼 */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            onClick={() => setShowYoutubeSkills(true)}
+            style={{
+              padding: '7px 14px', borderRadius: 9, fontSize: 12, fontWeight: 600,
+              background: 'linear-gradient(135deg,rgba(239,68,68,0.25),rgba(220,38,38,0.15))',
+              border: '1px solid rgba(239,68,68,0.40)',
+              color: '#fca5a5', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+              transition: 'all 0.2s',
+            }}
+          >
+            📺 YouTube 전문가
+          </button>
+          <button
+            onClick={() => setShowClipper(true)}
+            style={{
+              padding: '7px 14px', borderRadius: 9, fontSize: 12, fontWeight: 600,
+              background: 'linear-gradient(135deg,rgba(234,179,8,0.22),rgba(202,138,4,0.12))',
+              border: '1px solid rgba(234,179,8,0.35)',
+              color: '#fde68a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+              transition: 'all 0.2s',
+            }}
+          >
+            ✂️ 영상 클리퍼
+          </button>
+          <button
+            onClick={clearChat}
+            style={{
+              padding: '7px 12px', borderRadius: 9, fontSize: 12,
+              background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)',
+              color: 'rgba(255,255,255,0.55)', cursor: 'pointer',
+            }}
+          >새 대화</button>
+        </div>
       </div>
+
+      {/* ── YouTube 전문가 모달 ── */}
+      {showYoutubeSkills && (
+        <YouTubeSkillChat onClose={() => setShowYoutubeSkills(false)} />
+      )}
+
+      {/* ── 영상 클리퍼 모달 ── */}
+      {showClipper && (
+        <YouTubeClipperChat onClose={() => setShowClipper(false)} />
+      )}
 
       {/* ── 채팅 영역 ── */}
       <div style={{
