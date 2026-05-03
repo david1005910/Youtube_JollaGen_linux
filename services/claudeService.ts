@@ -12,8 +12,8 @@ import { SYSTEM_INSTRUCTIONS, getTrendSearchPrompt, getScriptGenerationPrompt } 
 
 const FAST_MODEL  = 'claude-haiku-4-5-20251001';  // 빠른 작업 (트렌드, 자막, 모션)
 const SMART_MODEL = 'claude-sonnet-4-6';           // 스크립트 생성
-// Claude 크레딧 부족 시 순서대로 시도 (2.0-flash: 1500/day 무료, 2.5-flash: 20/day 무료)
-const GEMINI_FALLBACK_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
+// Claude 크레딧 부족 시 순서대로 시도 (새 @google/genai SDK v1beta 지원 모델만)
+const GEMINI_FALLBACK_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash'];
 
 let _client: Anthropic | null = null;
 let _gemini: GoogleGenAI | null = null;
@@ -60,8 +60,11 @@ async function callGeminiFallback(system: string, userPrompt: string): Promise<s
       if (text) return text;
     } catch (e: any) {
       const msg = e?.message ?? '';
-      if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('429')) {
-        console.warn(`[Gemini 폴백] ${model} 할당량 초과 → 다음 모델 시도`);
+      const isSkippable =
+        msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('429') ||
+        msg.includes('not found') || msg.includes('not supported') || msg.includes('UNAVAILABLE');
+      if (isSkippable) {
+        console.warn(`[Gemini 폴백] ${model} 실패(${msg.slice(0, 60)}) → 다음 모델`);
         continue;
       }
       throw e;
