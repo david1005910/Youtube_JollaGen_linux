@@ -10,7 +10,8 @@
       "mcp__ide__getDiagnostics",
       "Bash(git config *)",
       "Bash(git commit -m ' *)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(git add *)"
     ]
   }
 }
