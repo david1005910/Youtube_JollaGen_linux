@@ -572,40 +572,40 @@ const App: React.FC = () => {
     setViewMode('main'); // 메인 뷰로 전환
   };
 
-  /* ── Gooey / Liquid Morphism shared style helpers ─────────────────────── */
-  const gooBlob = (top: string, left: string, right: string, bottom: string,
-                   w: number, h: number, color: string, radius?: string) => ({
-    position: 'absolute' as const, top, left, right, bottom,
-    width: w, height: h, pointerEvents: 'none' as const,
-    background: `radial-gradient(circle, ${color} 0%, transparent 70%)`,
-    borderRadius: radius || '50%',
-    filter: 'blur(48px)',
-  });
+  /* ── Chromatic Vaporwave Minimalism — palette constants ───────────────── */
+  const VP = {
+    pink:    '#FF4FBE',
+    cyan:    '#00F0FF',
+    purple:  '#9B5BFF',
+    magenta: '#FF7AD9',
+    orange:  '#FF6A3D',
+    navy:    '#0C0E23',
+    navyMid: '#0e0b2c',
+    navyDark:'#090b1a',
+  } as const;
 
   return (
     <div
-      className="min-h-screen text-white"
+      className="min-h-screen"
       style={{
-        background: 'linear-gradient(135deg, #f97316 0%, #ec4899 35%, #8b5cf6 65%, #3b82f6 100%)',
+        /* Dark Grid Navy base — subtle cyan grid overlay */
+        background: VP.navy,
+        backgroundImage: [
+          `linear-gradient(rgba(0,240,255,0.04) 1px, transparent 1px)`,
+          `linear-gradient(90deg, rgba(0,240,255,0.04) 1px, transparent 1px)`,
+          `linear-gradient(180deg, ${VP.navyMid} 0%, ${VP.navy} 40%, ${VP.navyDark} 100%)`,
+        ].join(','),
+        backgroundSize: '48px 48px, 48px 48px, 100% 100%',
+        color: '#fff',
         position: 'relative',
-        overflow: 'hidden',
       }}
     >
-      {/* SVG Gooey filter — makes overlapping blobs merge like liquid */}
-      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
-        <filter id="goo">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
-          <feColorMatrix in="blur" mode="matrix"
-            values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
-        </filter>
-      </svg>
-
-      {/* Decorative background blobs */}
-      <div style={gooBlob('-80px', '-80px', 'auto', 'auto', 320, 320, 'rgba(249,115,22,0.55)')} />
-      <div style={gooBlob('15%', 'auto', '-60px', 'auto', 260, 260, 'rgba(139,92,246,0.5)')} />
-      <div style={gooBlob('auto', '28%', 'auto', '6%', 220, 220, 'rgba(236,72,153,0.45)', '60% 40% 30% 70% / 60% 30% 70% 40%')} />
-      <div style={gooBlob('45%', '-40px', 'auto', 'auto', 180, 180, 'rgba(59,130,246,0.4)', '40% 60% 70% 30% / 40% 50% 60% 50%')} />
-      <div style={gooBlob('70%', 'auto', '10%', 'auto', 150, 150, 'rgba(249,115,22,0.35)')} />
+      {/* Top neon horizon stripe — vaporwave signature */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 2, zIndex: 100,
+        background: `linear-gradient(90deg, ${VP.pink}, ${VP.purple}, ${VP.cyan})`,
+        boxShadow: `0 0 16px rgba(155,91,255,0.7)`,
+      }} />
 
       <Header />
 
@@ -616,31 +616,33 @@ const App: React.FC = () => {
 
       {/* 네비게이션 탭 */}
       <div style={{
-        borderBottom: '1px solid rgba(255,255,255,0.18)',
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 100%)',
-        backdropFilter: 'blur(14px)',
+        borderBottom: `1px solid rgba(0,240,255,0.18)`,
+        background: VP.navyMid,
         position: 'relative', zIndex: 10,
       }}>
-        {/* glossy top-edge highlight */}
-        <div style={{ height: 1, background: 'linear-gradient(90deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1), rgba(255,255,255,0.5))' }} />
+        {/* Neon sweep accent line */}
+        <div style={{
+          height: 1,
+          background: `linear-gradient(90deg, transparent 0%, rgba(0,240,255,0.35) 40%, rgba(155,91,255,0.35) 70%, transparent 100%)`,
+        }} />
         <div className="max-w-7xl mx-auto px-4 flex items-center gap-1">
           <button
             onClick={() => setViewMode('main')}
             style={{
               padding: '12px 16px', fontSize: 14, fontWeight: 700,
               background: 'none', border: 'none', cursor: 'pointer',
-              position: 'relative', transition: 'all 0.2s',
-              color: viewMode === 'main' ? '#fff' : 'rgba(255,255,255,0.55)',
-              textShadow: '0px 2px 4px rgba(0,0,0,0.3)',
+              position: 'relative', transition: 'color 0.2s',
+              color: viewMode === 'main' ? VP.cyan : 'rgba(255,255,255,0.4)',
+              textShadow: viewMode === 'main' ? `0 0 12px rgba(0,240,255,0.45)` : 'none',
+              letterSpacing: '0.02em',
             }}
           >
             스토리보드 생성
             {viewMode === 'main' && (
               <div style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0, height: 3,
-                background: 'linear-gradient(90deg, rgba(255,255,255,0.9), rgba(255,255,255,0.3))',
-                borderRadius: '3px 3px 0 0',
-                boxShadow: '0 0 8px rgba(255,255,255,0.5)',
+                position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
+                background: `linear-gradient(90deg, ${VP.cyan}, ${VP.purple})`,
+                boxShadow: `0 0 10px rgba(0,240,255,0.6)`,
               }} />
             )}
           </button>
@@ -651,28 +653,28 @@ const App: React.FC = () => {
               padding: '12px 16px', fontSize: 14, fontWeight: 700,
               background: 'none', border: 'none', cursor: 'pointer',
               position: 'relative', display: 'flex', alignItems: 'center', gap: 8,
-              transition: 'all 0.2s',
-              color: viewMode === 'gallery' ? '#fff' : 'rgba(255,255,255,0.55)',
-              textShadow: '0px 2px 4px rgba(0,0,0,0.3)',
+              transition: 'color 0.2s',
+              color: viewMode === 'gallery' ? VP.pink : 'rgba(255,255,255,0.4)',
+              textShadow: viewMode === 'gallery' ? `0 0 12px rgba(255,79,190,0.45)` : 'none',
+              letterSpacing: '0.02em',
             }}
           >
             저장된 프로젝트
             {savedProjects.length > 0 && (
               <span style={{
-                padding: '2px 8px', borderRadius: 20, fontSize: 11,
-                background: 'rgba(255,255,255,0.25)',
-                border: '1px solid rgba(255,255,255,0.35)',
-                boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.2)',
+                padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                background: `linear-gradient(135deg, rgba(155,91,255,0.25), rgba(0,240,255,0.15))`,
+                border: `1px solid rgba(0,240,255,0.25)`,
+                color: VP.cyan,
               }}>
                 {savedProjects.length}
               </span>
             )}
             {viewMode === 'gallery' && (
               <div style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0, height: 3,
-                background: 'linear-gradient(90deg, rgba(255,255,255,0.9), rgba(255,255,255,0.3))',
-                borderRadius: '3px 3px 0 0',
-                boxShadow: '0 0 8px rgba(255,255,255,0.5)',
+                position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
+                background: `linear-gradient(90deg, ${VP.pink}, ${VP.purple})`,
+                boxShadow: `0 0 10px rgba(255,79,190,0.6)`,
               }} />
             )}
           </button>
@@ -683,17 +685,16 @@ const App: React.FC = () => {
             style={{
               marginLeft: 'auto', marginRight: 4, marginTop: 6, marginBottom: 6,
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 20px', borderRadius: 24,
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,255,255,0.45)',
+              padding: '8px 20px', borderRadius: 10,
+              background: `linear-gradient(135deg, ${VP.pink} 0%, ${VP.purple} 100%)`,
+              border: 'none',
               color: '#fff', fontSize: 14, fontWeight: 700,
-              boxShadow: '0 6px 20px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.4)',
-              textShadow: '0px 2px 4px rgba(0,0,0,0.35)',
-              cursor: 'pointer', transition: 'all 0.2s',
+              boxShadow: `0 0 12px rgba(255,79,190,0.45), 0 4px 20px rgba(155,91,255,0.3)`,
+              letterSpacing: '0.03em',
+              cursor: 'pointer', transition: 'box-shadow 0.2s',
             }}
           >
-            <span style={{ fontSize: 16 }}>▶</span>
+            <span style={{ fontSize: 15 }}>▶</span>
             YouTube 스킬
           </button>
         </div>
@@ -701,24 +702,23 @@ const App: React.FC = () => {
 
       {needsKey && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(245,158,11,0.35) 0%, rgba(245,158,11,0.15) 100%)',
-          backdropFilter: 'blur(10px)',
-          borderBottom: '1px solid rgba(245,158,11,0.3)',
+          background: `linear-gradient(90deg, rgba(255,106,61,0.12) 0%, rgba(255,79,190,0.1) 100%)`,
+          borderBottom: `1px solid rgba(255,106,61,0.35)`,
           padding: '10px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
           position: 'relative', zIndex: 10,
         }}>
-          <span style={{ color: '#fcd34d', fontSize: 13, fontWeight: 700, textShadow: '0 2px 4px rgba(0,0,0,0.35)' }}>
+          <span style={{ color: VP.orange, fontSize: 13, fontWeight: 700, letterSpacing: '0.01em' }}>
             Gemini 3 Pro 엔진을 위해 API 키 설정이 필요합니다.
           </span>
           <button
             onClick={handleOpenKeySelector}
             style={{
-              padding: '4px 14px', borderRadius: 14,
-              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-              color: '#1c1917', fontSize: 10, fontWeight: 900,
-              border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 2,
-              boxShadow: '0 4px 14px rgba(245,158,11,0.45)',
+              padding: '5px 14px', borderRadius: 8,
+              background: `linear-gradient(135deg, ${VP.orange}, ${VP.pink})`,
+              color: '#fff', fontSize: 10, fontWeight: 900,
+              border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 3,
+              boxShadow: `0 0 12px rgba(255,106,61,0.45)`,
             }}
           >
             API 키 설정
@@ -746,44 +746,42 @@ const App: React.FC = () => {
             <div style={{ maxWidth: 1280, margin: '0 auto 48px', padding: '0 16px', textAlign: 'center' }}>
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 16,
-                padding: '12px 28px', borderRadius: 32,
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 100%)',
-                backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                boxShadow: '0 12px 32px rgba(0,0,0,0.18), inset 0 1px 2px rgba(255,255,255,0.35)',
+                padding: '12px 28px', borderRadius: 12,
+                background: `linear-gradient(135deg, rgba(155,91,255,0.12) 0%, rgba(0,240,255,0.06) 100%)`,
+                border: `1px solid rgba(0,240,255,0.2)`,
+                boxShadow: `0 4px 20px rgba(0,240,255,0.12)`,
               }}>
                 {step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS ? (
                   <div style={{
-                    width: 16, height: 16,
-                    border: '2.5px solid rgba(255,255,255,0.9)',
+                    width: 15, height: 15,
+                    border: `2px solid ${VP.cyan}`,
                     borderTopColor: 'transparent',
                     borderRadius: '50%',
-                    animation: 'spin 0.8s linear infinite',
+                    animation: 'vpSpin 0.75s linear infinite',
+                    boxShadow: `0 0 8px rgba(0,240,255,0.5)`,
                   }} />
                 ) : (
                   <div style={{
-                    width: 10, height: 10, borderRadius: '50%',
-                    background: step === GenerationStep.ERROR
-                      ? 'radial-gradient(circle, #ff6b6b, #ef4444)'
-                      : 'radial-gradient(circle, #86efac, #22c55e)',
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: step === GenerationStep.ERROR ? VP.orange : VP.cyan,
                     boxShadow: step === GenerationStep.ERROR
-                      ? '0 0 10px rgba(239,68,68,0.7)'
-                      : '0 0 10px rgba(34,197,94,0.7)',
+                      ? `0 0 10px rgba(255,106,61,0.8)`
+                      : `0 0 10px rgba(0,240,255,0.8)`,
                   }} />
                 )}
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.02em' }}>
                   {progressMessage}
                 </span>
                 {(step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS) && (
                   <button
                     onClick={handleAbort}
                     style={{
-                      marginLeft: 8, padding: '4px 14px', borderRadius: 14,
-                      background: 'rgba(239,68,68,0.25)',
-                      border: '1px solid rgba(239,68,68,0.5)',
-                      color: '#fca5a5', fontSize: 10, fontWeight: 900,
+                      marginLeft: 8, padding: '4px 14px', borderRadius: 8,
+                      background: 'transparent',
+                      border: `1px solid rgba(255,79,190,0.5)`,
+                      color: VP.pink, fontSize: 10, fontWeight: 900,
                       cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 3,
-                      backdropFilter: 'blur(4px)',
+                      boxShadow: `0 0 8px rgba(255,79,190,0.25)`,
                     }}
                   >
                     Stop
@@ -804,7 +802,7 @@ const App: React.FC = () => {
         </main>
       )}
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes vpSpin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
