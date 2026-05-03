@@ -20,6 +20,8 @@ import { SavedProject } from './types';
 import { CONFIG, PRICING, formatKRW } from './config';
 import ProjectGallery from './components/ProjectGallery';
 import YouTubeSkillChat from './components/YouTubeSkillChat';
+import RemotionPreview from './components/RemotionPreview';
+import YouTubeClipperChat from './components/YouTubeClipperChat';
 import * as FileSaver from 'file-saver';
 
 const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
@@ -27,8 +29,8 @@ const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function cleanErrorMessage(error: any): string {
   const msg: string = error?.message || String(error);
-  if (msg.includes('할당량 초과') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
-    return 'API 할당량 초과. 잠시 후 다시 시도해주세요.';
+  if (msg.includes('할당량 초과') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('429')) {
+    return 'API 할당량 초과. 하단의 "💳 유료 키 설정" 버튼으로 유료 키를 등록하면 계속 사용할 수 있습니다.';
   }
   if (msg.includes('API 키') || msg.includes('permission') || msg.includes('PERMISSION')) {
     return 'API 키 권한 오류. 설정을 확인해주세요.';
@@ -62,6 +64,8 @@ const App: React.FC = () => {
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [currentTopic, setCurrentTopic] = useState<string>('');
   const [showYoutubeSkills, setShowYoutubeSkills] = useState(false);
+  const [showRemotionPreview, setShowRemotionPreview] = useState(false);
+  const [showClipper, setShowClipper] = useState(false);
 
   // 비용 추적
   const [currentCost, setCurrentCost] = useState<CostBreakdown | null>(null);
@@ -184,11 +188,8 @@ const App: React.FC = () => {
         setProgressMessage('외부 콘텐츠 분석 중...');
         targetTopic = "Custom Analysis Topic";
       } else {
-        setProgressMessage(`글로벌 경제 트렌드 탐색 중...`);
-        const trends = await findTrendingTopics(topic, usedTopicsRef.current);
-        if (isAbortedRef.current) return;
-        targetTopic = trends[0].topic;
-        usedTopicsRef.current.push(targetTopic);
+        // 사용자가 입력한 키워드를 그대로 사용 (AI가 다른 토픽으로 대체하지 않음)
+        setProgressMessage(`"${topic}" 스토리보드 생성 중...`);
       }
 
       setProgressMessage(`스토리보드 및 메타포 생성 중...`);
@@ -572,41 +573,46 @@ const App: React.FC = () => {
     setViewMode('main'); // 메인 뷰로 전환
   };
 
-  /* ── Chromatic Vaporwave Minimalism — palette constants ───────────────── */
-  const VP = {
-    pink:    '#FF4FBE',
-    cyan:    '#00F0FF',
-    purple:  '#9B5BFF',
-    magenta: '#FF7AD9',
-    orange:  '#FF6A3D',
-    navy:    '#0C0E23',
-    navyMid: '#0e0b2c',
-    navyDark:'#090b1a',
+  /* ── Glassmorphism — palette constants ────────────────────────────────── */
+  const GL = {
+    purple:      '#8B5CF6',
+    violet:      '#7C3AED',
+    blue:        '#3B82F6',
+    cyan:        '#06B6D4',
+    pink:        '#EC4899',
+    rose:        '#F43F5E',
+    teal:        '#14B8A6',
+    glass:       'rgba(255,255,255,0.18)',
+    glassBorder: 'rgba(255,255,255,0.35)',
+    shadow:      '0px 4px 24px rgba(0,0,0,0.20)',
+    innerGlow:   'inset 0px 0px 12px rgba(255,255,255,0.15)',
+  } as const;
+
+  const glassPanel = {
+    background:           GL.glass,
+    backdropFilter:       'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border:               `1px solid ${GL.glassBorder}`,
+    borderRadius:         20,
+    boxShadow:            `${GL.innerGlow}, ${GL.shadow}`,
   } as const;
 
   return (
     <div
       className="min-h-screen"
       style={{
-        /* Dark Grid Navy base — subtle cyan grid overlay */
-        background: VP.navy,
+        /* Multi-tone abstract gradient backdrop — required for glass depth */
+        background: '#0f0728',
         backgroundImage: [
-          `linear-gradient(rgba(0,240,255,0.04) 1px, transparent 1px)`,
-          `linear-gradient(90deg, rgba(0,240,255,0.04) 1px, transparent 1px)`,
-          `linear-gradient(180deg, ${VP.navyMid} 0%, ${VP.navy} 40%, ${VP.navyDark} 100%)`,
+          'radial-gradient(ellipse at 20% 15%, rgba(124,58,237,0.60) 0%, transparent 48%)',
+          'radial-gradient(ellipse at 78% 22%, rgba(59,130,246,0.50) 0%, transparent 48%)',
+          'radial-gradient(ellipse at 50% 88%, rgba(236,72,153,0.38) 0%, transparent 45%)',
+          'radial-gradient(ellipse at 85% 65%, rgba(20,184,166,0.30) 0%, transparent 40%)',
         ].join(','),
-        backgroundSize: '48px 48px, 48px 48px, 100% 100%',
         color: '#fff',
         position: 'relative',
       }}
     >
-      {/* Top neon horizon stripe — vaporwave signature */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 2, zIndex: 100,
-        background: `linear-gradient(90deg, ${VP.pink}, ${VP.purple}, ${VP.cyan})`,
-        boxShadow: `0 0 16px rgba(155,91,255,0.7)`,
-      }} />
-
       <Header />
 
       {/* YouTube Skill Studio 모달 */}
@@ -614,26 +620,36 @@ const App: React.FC = () => {
         <YouTubeSkillChat onClose={() => setShowYoutubeSkills(false)} />
       )}
 
-      {/* 네비게이션 탭 */}
+      {/* Remotion 영상 미리보기 모달 */}
+      {showRemotionPreview && (
+        <RemotionPreview
+          assets={generatedData}
+          onClose={() => setShowRemotionPreview(false)}
+        />
+      )}
+
+      {/* YouTube Clipper 모달 */}
+      {showClipper && (
+        <YouTubeClipperChat onClose={() => setShowClipper(false)} />
+      )}
+
+      {/* 네비게이션 탭 — glass surface */}
       <div style={{
-        borderBottom: `1px solid rgba(0,240,255,0.18)`,
-        background: VP.navyMid,
+        background:           'rgba(255,255,255,0.10)',
+        backdropFilter:       'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom:         '1px solid rgba(255,255,255,0.20)',
         position: 'relative', zIndex: 10,
       }}>
-        {/* Neon sweep accent line */}
-        <div style={{
-          height: 1,
-          background: `linear-gradient(90deg, transparent 0%, rgba(0,240,255,0.35) 40%, rgba(155,91,255,0.35) 70%, transparent 100%)`,
-        }} />
         <div className="max-w-7xl mx-auto px-4 flex items-center gap-1">
           <button
             onClick={() => setViewMode('main')}
             style={{
-              padding: '12px 16px', fontSize: 14, fontWeight: 700,
+              padding: '12px 16px', fontSize: 14, fontWeight: 600,
               background: 'none', border: 'none', cursor: 'pointer',
               position: 'relative', transition: 'color 0.2s',
-              color: viewMode === 'main' ? VP.cyan : 'rgba(255,255,255,0.4)',
-              textShadow: viewMode === 'main' ? `0 0 12px rgba(0,240,255,0.45)` : 'none',
+              color: viewMode === 'main' ? '#fff' : 'rgba(255,255,255,0.45)',
+              textShadow: viewMode === 'main' ? '0px 1px 3px rgba(0,0,0,0.25)' : 'none',
               letterSpacing: '0.02em',
             }}
           >
@@ -641,8 +657,8 @@ const App: React.FC = () => {
             {viewMode === 'main' && (
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
-                background: `linear-gradient(90deg, ${VP.cyan}, ${VP.purple})`,
-                boxShadow: `0 0 10px rgba(0,240,255,0.6)`,
+                background: `linear-gradient(90deg, ${GL.cyan}, ${GL.purple})`,
+                borderRadius: 2,
               }} />
             )}
           </button>
@@ -650,22 +666,23 @@ const App: React.FC = () => {
           <button
             onClick={() => setViewMode('gallery')}
             style={{
-              padding: '12px 16px', fontSize: 14, fontWeight: 700,
+              padding: '12px 16px', fontSize: 14, fontWeight: 600,
               background: 'none', border: 'none', cursor: 'pointer',
               position: 'relative', display: 'flex', alignItems: 'center', gap: 8,
               transition: 'color 0.2s',
-              color: viewMode === 'gallery' ? VP.pink : 'rgba(255,255,255,0.4)',
-              textShadow: viewMode === 'gallery' ? `0 0 12px rgba(255,79,190,0.45)` : 'none',
+              color: viewMode === 'gallery' ? '#fff' : 'rgba(255,255,255,0.45)',
+              textShadow: viewMode === 'gallery' ? '0px 1px 3px rgba(0,0,0,0.25)' : 'none',
               letterSpacing: '0.02em',
             }}
           >
             저장된 프로젝트
             {savedProjects.length > 0 && (
               <span style={{
-                padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-                background: `linear-gradient(135deg, rgba(155,91,255,0.25), rgba(0,240,255,0.15))`,
-                border: `1px solid rgba(0,240,255,0.25)`,
-                color: VP.cyan,
+                padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                background: 'rgba(255,255,255,0.18)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                color: '#fff',
+                textShadow: '0px 1px 3px rgba(0,0,0,0.25)',
               }}>
                 {savedProjects.length}
               </span>
@@ -673,52 +690,86 @@ const App: React.FC = () => {
             {viewMode === 'gallery' && (
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
-                background: `linear-gradient(90deg, ${VP.pink}, ${VP.purple})`,
-                boxShadow: `0 0 10px rgba(255,79,190,0.6)`,
+                background: `linear-gradient(90deg, ${GL.pink}, ${GL.purple})`,
+                borderRadius: 2,
               }} />
             )}
           </button>
 
-          {/* YouTube Skill Studio 버튼 */}
-          <button
-            onClick={() => setShowYoutubeSkills(true)}
-            style={{
-              marginLeft: 'auto', marginRight: 4, marginTop: 6, marginBottom: 6,
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 20px', borderRadius: 10,
-              background: `linear-gradient(135deg, ${VP.pink} 0%, ${VP.purple} 100%)`,
-              border: 'none',
-              color: '#fff', fontSize: 14, fontWeight: 700,
-              boxShadow: `0 0 12px rgba(255,79,190,0.45), 0 4px 20px rgba(155,91,255,0.3)`,
-              letterSpacing: '0.03em',
-              cursor: 'pointer', transition: 'box-shadow 0.2s',
-            }}
-          >
-            <span style={{ fontSize: 15 }}>▶</span>
-            YouTube 스킬
-          </button>
+          {/* 버튼 그룹 */}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', marginRight: 4, marginTop: 6, marginBottom: 6 }}>
+            {/* Clipper 버튼 */}
+            <button
+              onClick={() => setShowClipper(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                padding: '8px 18px', borderRadius: 12,
+                background: 'linear-gradient(135deg, rgba(20,184,166,0.65) 0%, rgba(59,130,246,0.55) 100%)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                color: '#fff', fontSize: 13, fontWeight: 600,
+                boxShadow: '0px 4px 24px rgba(0,0,0,0.20), inset 0px 0px 12px rgba(255,255,255,0.12)',
+                letterSpacing: '0.02em',
+                cursor: 'pointer', transition: 'opacity 0.2s',
+                textShadow: '0px 1px 3px rgba(0,0,0,0.25)',
+              }}
+            >
+              ✂️ Clipper
+            </button>
+
+            {/* YouTube Skill Studio 버튼 */}
+            <button
+              onClick={() => setShowYoutubeSkills(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 20px', borderRadius: 12,
+                background: 'linear-gradient(135deg, rgba(139,92,246,0.65) 0%, rgba(236,72,153,0.55) 100%)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                color: '#fff', fontSize: 14, fontWeight: 600,
+                boxShadow: '0px 4px 24px rgba(0,0,0,0.20), inset 0px 0px 12px rgba(255,255,255,0.12)',
+                letterSpacing: '0.03em',
+                cursor: 'pointer', transition: 'box-shadow 0.2s',
+                textShadow: '0px 1px 3px rgba(0,0,0,0.25)',
+              }}
+            >
+              <span style={{ fontSize: 15 }}>▶</span>
+              YouTube 스킬
+            </button>
+          </div>
         </div>
       </div>
 
       {needsKey && (
         <div style={{
-          background: `linear-gradient(90deg, rgba(255,106,61,0.12) 0%, rgba(255,79,190,0.1) 100%)`,
-          borderBottom: `1px solid rgba(255,106,61,0.35)`,
+          background:           'rgba(244,63,94,0.18)',
+          backdropFilter:       'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderBottom:         '1px solid rgba(255,255,255,0.25)',
           padding: '10px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
           position: 'relative', zIndex: 10,
         }}>
-          <span style={{ color: VP.orange, fontSize: 13, fontWeight: 700, letterSpacing: '0.01em' }}>
+          <span style={{
+            color: '#fda4af', fontSize: 13, fontWeight: 600,
+            textShadow: '0px 1px 3px rgba(0,0,0,0.25)',
+          }}>
             Gemini 3 Pro 엔진을 위해 API 키 설정이 필요합니다.
           </span>
           <button
             onClick={handleOpenKeySelector}
             style={{
-              padding: '5px 14px', borderRadius: 8,
-              background: `linear-gradient(135deg, ${VP.orange}, ${VP.pink})`,
-              color: '#fff', fontSize: 10, fontWeight: 900,
-              border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 3,
-              boxShadow: `0 0 12px rgba(255,106,61,0.45)`,
+              padding: '5px 14px', borderRadius: 10,
+              background: 'rgba(255,255,255,0.22)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255,255,255,0.40)',
+              color: '#fff', fontSize: 10, fontWeight: 800,
+              cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 3,
+              boxShadow: `0px 4px 24px rgba(0,0,0,0.20)`,
+              textShadow: '0px 1px 3px rgba(0,0,0,0.25)',
             }}
           >
             API 키 설정
@@ -746,42 +797,49 @@ const App: React.FC = () => {
             <div style={{ maxWidth: 1280, margin: '0 auto 48px', padding: '0 16px', textAlign: 'center' }}>
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 16,
-                padding: '12px 28px', borderRadius: 12,
-                background: `linear-gradient(135deg, rgba(155,91,255,0.12) 0%, rgba(0,240,255,0.06) 100%)`,
-                border: `1px solid rgba(0,240,255,0.2)`,
-                boxShadow: `0 4px 20px rgba(0,240,255,0.12)`,
+                padding: '12px 28px',
+                ...glassPanel,
+                borderRadius: 16,
               }}>
                 {step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS ? (
                   <div style={{
                     width: 15, height: 15,
-                    border: `2px solid ${VP.cyan}`,
+                    border: `2px solid rgba(255,255,255,0.80)`,
                     borderTopColor: 'transparent',
                     borderRadius: '50%',
-                    animation: 'vpSpin 0.75s linear infinite',
-                    boxShadow: `0 0 8px rgba(0,240,255,0.5)`,
+                    animation: 'glSpin 0.75s linear infinite',
                   }} />
                 ) : (
                   <div style={{
                     width: 8, height: 8, borderRadius: '50%',
-                    background: step === GenerationStep.ERROR ? VP.orange : VP.cyan,
+                    background: step === GenerationStep.ERROR
+                      ? GL.rose
+                      : GL.teal,
                     boxShadow: step === GenerationStep.ERROR
-                      ? `0 0 10px rgba(255,106,61,0.8)`
-                      : `0 0 10px rgba(0,240,255,0.8)`,
+                      ? '0 0 10px rgba(244,63,94,0.7)'
+                      : '0 0 10px rgba(20,184,166,0.7)',
                   }} />
                 )}
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.02em' }}>
+                <span style={{
+                  fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.92)',
+                  letterSpacing: '0.02em',
+                  textShadow: '0px 1px 3px rgba(0,0,0,0.25)',
+                }}>
                   {progressMessage}
                 </span>
                 {(step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS) && (
                   <button
                     onClick={handleAbort}
                     style={{
-                      marginLeft: 8, padding: '4px 14px', borderRadius: 8,
-                      background: 'transparent',
-                      border: `1px solid rgba(255,79,190,0.5)`,
-                      color: VP.pink, fontSize: 10, fontWeight: 900,
+                      marginLeft: 8, padding: '4px 14px', borderRadius: 10,
+                      background: 'rgba(255,255,255,0.15)',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(255,255,255,0.35)',
+                      color: '#fff', fontSize: 10, fontWeight: 800,
                       cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 3,
-                      boxShadow: `0 0 8px rgba(255,79,190,0.25)`,
+                      boxShadow: '0px 4px 24px rgba(0,0,0,0.20)',
+                      textShadow: '0px 1px 3px rgba(0,0,0,0.25)',
                     }}
                   >
                     Stop
@@ -795,6 +853,7 @@ const App: React.FC = () => {
             data={generatedData}
             onRegenerateImage={handleRegenerateImage}
             onExportVideo={triggerVideoExport}
+            onRemotionPreview={() => setShowRemotionPreview(true)}
             isExporting={isVideoGenerating}
             animatingIndices={animatingIndices}
             onGenerateAnimation={handleGenerateAnimation}
@@ -802,7 +861,7 @@ const App: React.FC = () => {
         </main>
       )}
 
-      <style>{`@keyframes vpSpin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes glSpin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

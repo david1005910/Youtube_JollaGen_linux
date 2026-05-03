@@ -12,6 +12,7 @@ interface ResultTableProps {
   onRegenerateImage?: (index: number) => void;
   onUpgradeImage?: (index: number) => void;
   onExportVideo?: (enableSubtitles: boolean) => void;
+  onRemotionPreview?: () => void;
   onGenerateAnimation?: (index: number) => void;  // 영상 변환 콜백
   isExporting?: boolean;
   animatingIndices?: Set<number>;  // 현재 영상 변환 중인 인덱스들
@@ -242,7 +243,7 @@ const TableRow: React.FC<TableRowProps> = memo(({ row, index, isAnimating, onReg
 
 TableRow.displayName = 'TableRow';
 
-const ResultTable: React.FC<ResultTableProps> = ({ data, onRegenerateImage, onExportVideo, onGenerateAnimation, isExporting, animatingIndices }) => {
+const ResultTable: React.FC<ResultTableProps> = ({ data, onRegenerateImage, onExportVideo, onRemotionPreview, onGenerateAnimation, isExporting, animatingIndices }) => {
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title: string; durationSec: number } | null>(null);
   const handleOpenVideo = useCallback((src: string, title: string, durationSec: number) => {
     setPreviewVideo({ src, title, durationSec });
@@ -274,6 +275,17 @@ const ResultTable: React.FC<ResultTableProps> = ({ data, onRegenerateImage, onEx
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               SRT 자막 다운로드
             </button>
+            {onRemotionPreview && (
+              <button
+                onClick={onRemotionPreview}
+                className="px-5 py-2.5 rounded-xl transition-all font-black text-[10px] flex items-center justify-center gap-2 bg-purple-900 text-purple-200 hover:bg-purple-800 border border-purple-700"
+              >
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-4l-4 7h8l-4-7z"/>
+                </svg>
+                Remotion 미리보기
+              </button>
+            )}
             <button onClick={() => onExportVideo?.(false)} disabled={isExporting} className={`px-5 py-2.5 rounded-xl transition-all font-black text-[10px] flex items-center justify-center gap-2 ${isExporting ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600'}`}>
                 {isExporting ? <div className="w-3 h-3 border-2 border-slate-500 border-t-transparent animate-spin rounded-full"></div> : <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
                 MP4 (자막 X)

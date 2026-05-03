@@ -2,14 +2,19 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { ScriptScene, ReferenceImages } from "../types";
 import { SYSTEM_INSTRUCTIONS, getTrendSearchPrompt, getScriptGenerationPrompt, getFinalVisualPrompt } from "./prompts";
-import { CONFIG, GEMINI_STYLE_CATEGORIES, GeminiStyleId } from "../config";
-
-/**
- * Gemini API 클라이언트 초기화
- */
-const getAI = () => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+import { CONFIG, GEMINI_STYLE_CATEGORIES, GeminiStyleId, getApiModelId, ImageModelId } from "../config";
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// 기본키 / 유료키 분리 (GEMINI_API_KEY_PAID 설정 시 할당량 초과 자동 폴백)
+const getAI = (usePaid = false) => {
+  const key = usePaid && process.env.GEMINI_API_KEY_PAID
+    ? process.env.GEMINI_API_KEY_PAID
+    : process.env.GEMINI_API_KEY!;
+  return new GoogleGenAI({ apiKey: key });
+};
+
+const hasPaidKey = () => Boolean(process.env.GEMINI_API_KEY_PAID);
 
 /**
  * 안전 필터 우회를 위한 키워드 대체 맵
@@ -200,35 +205,63 @@ function findLastCompleteSceneObject(json: string): number {
   return lastCompleteEnd;
 }
 
+const isQuotaError = (error: any): boolean => {
+  const msg = error?.message || JSON.stringify(error);
+  return msg.includes('429') || msg.includes('Quota') ||
+    msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') ||
+    msg.includes('rate limit') || error?.status === 429 || error?.status === 503;
+};
+
 const retryGeminiRequest = async <T>(
   operationName: string,
-  requestFn: () => Promise<T>,
+  requestFn: (usePaid: boolean) => Promise<T>,
   maxRetries: number = 3,
   baseDelay: number = 5000
 ): Promise<T> => {
   let lastError: any;
+
+  // 1단계: 기본 키로 시도
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await requestFn();
+      return await requestFn(false);
     } catch (error: any) {
       lastError = error;
-      const errorMsg = error.message || JSON.stringify(error);
-      const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') ||
-        errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('quota') ||
-        errorMsg.includes('rate') || error.status === 429 || error.status === 503;
-      if (isQuotaError && attempt < maxRetries) {
-        await wait(baseDelay * attempt);
-        continue;
+      if (isQuotaError(error)) {
+        if (hasPaidKey()) {
+          console.log(`[${operationName}] 기본 키 할당량 초과 → 유료 키로 전환`);
+          break; // 유료 키 단계로 이동
+        }
+        if (attempt < maxRetries) {
+          await wait(baseDelay * attempt);
+          continue;
+        }
       }
       throw error;
     }
   }
+
+  // 2단계: 유료 키가 있으면 재시도
+  if (hasPaidKey()) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await requestFn(true);
+      } catch (error: any) {
+        lastError = error;
+        if (isQuotaError(error) && attempt < maxRetries) {
+          await wait(baseDelay * attempt);
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
   throw lastError;
 };
 
 export const findTrendingTopics = async (category: string, usedTopics: string[]) => {
-  return retryGeminiRequest("Trend Search", async () => {
-    const ai = getAI();
+  return retryGeminiRequest("Trend Search", async (usePaid) => {
+    const ai = getAI(usePaid);
     const prompt = getTrendSearchPrompt(category, usedTopics.join(", "));
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
@@ -254,8 +287,8 @@ const generateScriptSingle = async (
   sourceContext?: string | null,
   chunkInfo?: { current: number; total: number }
 ): Promise<ScriptScene[]> => {
-  return retryGeminiRequest("Script Generation", async () => {
-    const ai = getAI();
+  return retryGeminiRequest("Script Generation", async (usePaid) => {
+    const ai = getAI(usePaid);
     const baseInstruction = topic === "Manual Script Input" ? SYSTEM_INSTRUCTIONS.MANUAL_VISUAL_MATCHER :
                             hasReferenceImage ? SYSTEM_INSTRUCTIONS.REFERENCE_MATCH :
                             SYSTEM_INSTRUCTIONS.CHIEF_ART_DIRECTOR;
@@ -540,7 +573,8 @@ const getStrengthDescription = (strength: number): { level: string; instruction:
 export const generateImageForScene = async (
   scene: ScriptScene,
   referenceImages: ReferenceImages,
-  stylePrompt?: string
+  stylePrompt?: string,
+  imageModelId?: string   // 호출 측에서 지정 (없으면 getSelectedImageModel 사용)
 ): Promise<string | null> => {
   // 캐릭터 참조 이미지가 있으면 고정 프롬프트 제외
   const hasCharacterRef = referenceImages.character && referenceImages.character.length > 0;
@@ -561,7 +595,16 @@ export const generateImageForScene = async (
   const characterStrength = referenceImages.characterStrength ?? 70;
   const styleStrength = referenceImages.styleStrength ?? 70;
 
-  console.log(`[Image Gen] 캐릭터 강도: ${characterStrength}%, 스타일 강도: ${styleStrength}%`);
+  // 사용할 Gemini 이미지 모델 결정
+  const resolvedModelId: string = imageModelId
+    ? getApiModelId(imageModelId as ImageModelId)
+    : getApiModelId(
+        (typeof localStorage !== 'undefined'
+          ? (localStorage.getItem('tubegen_image_model') as ImageModelId | null)
+          : null) ?? 'gemini-2.0-flash-image'
+      );
+
+  console.log(`[Image Gen] 모델: ${resolvedModelId}, 캐릭터 강도: ${characterStrength}%, 스타일 강도: ${styleStrength}%`);
 
   const MAX_SANITIZE_ATTEMPTS = 3; // 대체어 시도 횟수
   let lastError: any;
@@ -577,8 +620,8 @@ export const generateImageForScene = async (
     }
 
     try {
-      const result = await retryGeminiRequest("Pro Image Generation", async () => {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const result = await retryGeminiRequest("Pro Image Generation", async (usePaid) => {
+        const ai = getAI(usePaid);
         const parts: any[] = [];
 
         // 캐릭터 참조 이미지 추가 (강도 정보 포함)
@@ -631,13 +674,11 @@ Ensure the entire image consistently follows this visual style.`
         parts.push({ text: `[SCENE PROMPT]\n${sanitizedPrompt}` });
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: resolvedModelId,
           contents: { parts },
           config: {
-            responseModalities: [Modality.IMAGE],
-            imageConfig: {
-              aspectRatio: '16:9'
-            }
+            responseModalities: [Modality.IMAGE, Modality.TEXT],
+            imageConfig: { aspectRatio: '16:9' }
           }
         });
 
@@ -677,8 +718,8 @@ Ensure the entire image consistently follows this visual style.`
 };
 
 export const generateAudioForScene = async (text: string) => {
-  return retryGeminiRequest("TTS Generation", async () => {
-    const ai = getAI();
+  return retryGeminiRequest("TTS Generation", async (usePaid) => {
+    const ai = getAI(usePaid);
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: { parts: [{ text }] },
@@ -701,8 +742,8 @@ export const splitSubtitleByMeaning = async (
   narration: string,
   maxChars: number = 20
 ): Promise<string[]> => {
-  return retryGeminiRequest("Subtitle Split", async () => {
-    const ai = getAI();
+  return retryGeminiRequest("Subtitle Split", async (usePaid) => {
+    const ai = getAI(usePaid);
 
     const prompt = `자막 분리 작업입니다. 원문을 청크로 나누세요.
 

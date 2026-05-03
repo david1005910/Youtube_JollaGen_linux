@@ -5,8 +5,8 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
-    const { scene, referenceImages, stylePrompt } = await req.json();
-    const imageData = await generateImageForScene(scene, referenceImages, stylePrompt);
+    const { scene, referenceImages, stylePrompt, imageModelId } = await req.json();
+    const imageData = await generateImageForScene(scene, referenceImages, stylePrompt, imageModelId);
     return NextResponse.json({ imageData });
   } catch (e: any) {
     console.error('[API] gemini/image error:', e.message);

@@ -32,7 +32,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
   const [styleStrength, setStyleStrength] = useState(DEFAULT_REFERENCE_IMAGES.styleStrength);
 
   // 이미지 모델 설정
-  const [imageModelId, setImageModelId] = useState<ImageModelId>('gemini-2.5-flash-image');
+  const [imageModelId, setImageModelId] = useState<ImageModelId>('gemini-2.0-flash-image');
   // Gemini 스타일 설정
   const [geminiStyleId, setGeminiStyleId] = useState<GeminiStyleId>('gemini-none');
   const [geminiCustomStylePrompt, setGeminiCustomStylePrompt] = useState('');
@@ -44,6 +44,10 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
 
   // ElevenLabs 설정 상태
   const [showElevenLabsSettings, setShowElevenLabsSettings] = useState(false);
+  const [showPaidKeyModal, setShowPaidKeyModal] = useState(false);
+  const [paidKeyInput, setPaidKeyInput] = useState('');
+  const [paidKeyStatus, setPaidKeyStatus] = useState<'unknown'|'saving'|'saved'|'error'>('unknown');
+  const [paidKeyMasked, setPaidKeyMasked] = useState('');
   // API 키는 서버 환경변수에서 관리 (클라이언트 노출 없음)
   const [elVoiceId, setElVoiceId] = useState('');
   const [elModelId, setElModelId] = useState<ElevenLabsModelId>('eleven_multilingual_v2');
@@ -353,6 +357,40 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
   const isProcessing = step !== GenerationStep.IDLE && step !== GenerationStep.COMPLETED && step !== GenerationStep.ERROR;
 
   // 폼 제출 핸들러 (useCallback으로 메모이제이션)
+  const openPaidKeyModal = useCallback(async () => {
+    setShowPaidKeyModal(true);
+    try {
+      const res = await fetch('/api/settings/apikey');
+      const data = await res.json();
+      if (data.paidKeyMasked) setPaidKeyMasked(data.paidKeyMasked);
+    } catch {}
+  }, []);
+
+  const savePaidKey = useCallback(async () => {
+    if (!paidKeyInput.trim()) return;
+    setPaidKeyStatus('saving');
+    try {
+      const res = await fetch('/api/settings/apikey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paidKey: paidKeyInput.trim() }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error);
+      setPaidKeyMasked(data.masked);
+      setPaidKeyInput('');
+      setPaidKeyStatus('saved');
+    } catch (e: any) {
+      setPaidKeyStatus('error');
+    }
+  }, [paidKeyInput]);
+
+  const deletePaidKey = useCallback(async () => {
+    await fetch('/api/settings/apikey', { method: 'DELETE' });
+    setPaidKeyMasked('');
+    setPaidKeyStatus('unknown');
+  }, []);
+
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (isProcessing) return;
@@ -982,35 +1020,86 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {IMAGE_MODELS.map((model) => (
-              <button
-                key={model.id}
-                type="button"
-                onClick={() => selectImageModel(model.id)}
-                className={`p-4 rounded-xl border text-left transition-all ${
-                  imageModelId === model.id
-                    ? 'bg-blue-600/20 border-blue-500 text-white'
-                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-bold text-sm">{model.name}</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
-                    {model.provider}
-                  </span>
-                </div>
-                <div className="text-xs opacity-70 mb-2">{model.description}</div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-green-400 font-bold">${model.pricePerImage.toFixed(4)}/장</span>
-                  <span className="text-slate-500">{model.speed}</span>
-                </div>
-              </button>
-            ))}
+          {/* ── Gemini 모델 섹션 (강조) */}
+          <div className="mb-3">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+              <span>🤖</span> Google Gemini
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {IMAGE_MODELS.filter(m => m.provider === 'Google').map((model) => {
+                const isSelected = imageModelId === model.id;
+                const isFree = (model as any).tier === 'free';
+                return (
+                  <button
+                    key={model.id}
+                    type="button"
+                    onClick={() => selectImageModel(model.id)}
+                    className={`p-4 rounded-xl border text-left transition-all relative ${
+                      isSelected
+                        ? 'border-blue-400 text-white'
+                        : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                    }`}
+                    style={isSelected ? { background: 'rgba(59,130,246,0.15)' } : {}}
+                  >
+                    {isFree && (
+                      <span className="absolute top-2 right-2 text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-600/80 text-white tracking-widest">
+                        무료
+                      </span>
+                    )}
+                    {!isFree && (
+                      <span className="absolute top-2 right-2 text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-600/70 text-white tracking-widest">
+                        유료키
+                      </span>
+                    )}
+                    <div className="flex items-center gap-2 mb-1 pr-10">
+                      <span className="font-bold text-sm">{model.name}</span>
+                    </div>
+                    <div className="text-xs opacity-70 mb-1">{model.description}</div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className={isFree ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+                        {isFree ? '무료' : `$${model.pricePerImage.toFixed(4)}/장`}
+                      </span>
+                      <span className="text-slate-500">{model.speed}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── 기타 모델 섹션 */}
+          <div>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">기타 모델</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {IMAGE_MODELS.filter(m => m.provider !== 'Google').map((model) => (
+                <button
+                  key={model.id}
+                  type="button"
+                  onClick={() => selectImageModel(model.id)}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    imageModelId === model.id
+                      ? 'bg-blue-600/20 border-blue-500 text-white'
+                      : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-sm">{model.name}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
+                      {model.provider}
+                    </span>
+                  </div>
+                  <div className="text-xs opacity-70 mb-2">{model.description}</div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-amber-400 font-bold">${model.pricePerImage.toFixed(4)}/장</span>
+                    <span className="text-slate-500">{model.speed}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Gemini 화풍 선택 */}
-          {imageModelId === 'gemini-2.5-flash-image' && (
+          {(imageModelId === 'gemini-2.5-flash-image' || imageModelId === 'gemini-2.0-flash-image' || imageModelId === 'gemini-3-pro-image') && (
             <div className="mt-4 pt-4 border-t border-slate-700">
               {/* 화풍 선택 헤더 */}
               <div className="flex items-center justify-between mb-4">
@@ -1110,6 +1199,95 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
         </div>
       </div>
 
+      {/* 유료 키 설정 모달 */}
+      {showPaidKeyModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 2000,
+          background: 'rgba(9,11,26,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(6px)',
+        }} onClick={() => setShowPaidKeyModal(false)}>
+          <div style={{
+            background: 'rgba(255,255,255,0.14)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.30)',
+            borderRadius: 20,
+            boxShadow: 'inset 0 0 12px rgba(255,255,255,0.10), 0 8px 40px rgba(0,0,0,0.35)',
+            padding: 28, width: '90%', maxWidth: 480,
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.25)' }}>
+              💳 유료 Gemini API 키 설정
+            </h3>
+            <p style={{ margin: '0 0 18px', fontSize: 12, color: 'rgba(255,255,255,0.50)', lineHeight: 1.6 }}>
+              할당량 초과 시 유료 키로 자동 전환됩니다.<br/>
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer"
+                style={{ color: '#a78bfa', textDecoration: 'underline' }}>
+                Google AI Studio → 유료 프로젝트에서 발급
+              </a>
+            </p>
+
+            {paidKeyMasked && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.30)',
+                borderRadius: 10, padding: '8px 14px', marginBottom: 14,
+              }}>
+                <span style={{ fontSize: 13, color: '#34d399' }}>
+                  ✅ 유료 키 등록됨: {paidKeyMasked}
+                </span>
+                <button onClick={deletePaidKey} style={{
+                  background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
+                  cursor: 'pointer', fontSize: 12,
+                }}>삭제</button>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="password"
+                value={paidKeyInput}
+                onChange={e => { setPaidKeyInput(e.target.value); setPaidKeyStatus('unknown'); }}
+                placeholder="AIzaSy..."
+                style={{
+                  flex: 1,
+                  background: 'rgba(255,255,255,0.10)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 10, padding: '9px 12px',
+                  color: '#fff', fontSize: 13, outline: 'none',
+                }}
+              />
+              <button
+                onClick={savePaidKey}
+                disabled={!paidKeyInput.trim() || paidKeyStatus === 'saving'}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(139,92,246,0.75), rgba(59,130,246,0.65))',
+                  border: '1px solid rgba(255,255,255,0.30)',
+                  borderRadius: 10, padding: '9px 18px',
+                  color: '#fff', fontWeight: 700, fontSize: 13,
+                  cursor: 'pointer', opacity: !paidKeyInput.trim() ? 0.5 : 1,
+                  textShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                }}
+              >
+                {paidKeyStatus === 'saving' ? '저장 중...' : '저장'}
+              </button>
+            </div>
+            {paidKeyStatus === 'saved' && <p style={{ margin: '8px 0 0', fontSize: 12, color: '#34d399' }}>✅ 저장됨 — 다음 요청부터 적용됩니다.</p>}
+            {paidKeyStatus === 'error' && <p style={{ margin: '8px 0 0', fontSize: 12, color: '#f87171' }}>❌ 저장 실패 — 키 형식을 확인하세요 (AIzaSy...).</p>}
+
+            <button onClick={() => setShowPaidKeyModal(false)} style={{
+              width: '100%', marginTop: 16,
+              background: 'rgba(255,255,255,0.10)',
+              border: '1px solid rgba(255,255,255,0.20)',
+              borderRadius: 10, padding: '9px',
+              color: 'rgba(255,255,255,0.60)', fontSize: 13,
+              cursor: 'pointer',
+            }}>닫기</button>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
         {activeTab === 'auto' ? (
           <div className="relative group">
@@ -1166,6 +1344,28 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
           </div>
         )}
       </form>
+
+      {/* 유료 키 설정 버튼 (할당량 초과 대비) */}
+      <div className="max-w-2xl mx-auto mt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={openPaidKeyModal}
+          style={{
+            background: 'rgba(255,255,255,0.08)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            borderRadius: 8,
+            padding: '5px 14px',
+            color: 'rgba(255,255,255,0.45)',
+            fontSize: 11, fontWeight: 600, cursor: 'pointer',
+            letterSpacing: '0.04em',
+            textShadow: '0 1px 3px rgba(0,0,0,0.25)',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          💳 API 할당량 초과 시 유료 키 설정
+        </button>
+      </div>
     </div>
   );
 };

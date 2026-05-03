@@ -129,10 +129,10 @@ export const generateImage = async (
     return imageData;
   }
 
-  // 기본: Gemini (참조 이미지 지원)
+  // 기본: Gemini (참조 이미지 지원) — 모델 ID 전달
   const { imageData } = await apiFetch<{ imageData: string | null }>(
     '/api/gemini/image',
-    { scene, referenceImages, stylePrompt }
+    { scene, referenceImages, stylePrompt, imageModelId: modelId }
   );
   return imageData;
 };

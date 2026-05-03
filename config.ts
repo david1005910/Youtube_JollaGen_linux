@@ -8,12 +8,34 @@
 // 이미지 생성 모델 목록
 export const IMAGE_MODELS = [
   {
+    id: 'gemini-2.0-flash-image',
+    name: 'Gemini 3.1 Flash Image (무료)',
+    provider: 'Google',
+    pricePerImage: 0,
+    description: '무료 티어, 최신 Flash 모델, 참조 이미지 지원, 권장',
+    speed: '빠름',
+    apiModelId: 'gemini-3.1-flash-image-preview',
+    tier: 'free',
+  },
+  {
     id: 'gemini-2.5-flash-image',
-    name: 'Gemini 2.5 Flash',
+    name: 'Gemini 2.5 Flash Image (유료)',
     provider: 'Google',
     pricePerImage: 0.0315,
-    description: '고품질, 참조 이미지 지원',
-    speed: '보통'
+    description: '고품질, 참조 이미지 지원 (유료 키 필요)',
+    speed: '보통',
+    apiModelId: 'gemini-2.5-flash-image',
+    tier: 'paid',
+  },
+  {
+    id: 'gemini-3-pro-image',
+    name: 'Gemini 3 Pro Image (유료)',
+    provider: 'Google',
+    pricePerImage: 0.06,
+    description: '최고 품질, Pro급 이미지 생성 (유료 키 필요)',
+    speed: '보통',
+    apiModelId: 'gemini-3-pro-image-preview',
+    tier: 'paid',
   },
   {
     id: 'dall-e-3',
@@ -21,7 +43,9 @@ export const IMAGE_MODELS = [
     provider: 'OpenAI',
     pricePerImage: 0.04,
     description: '자연어 이해 우수, 텍스트 포함 강점',
-    speed: '보통'
+    speed: '보통',
+    apiModelId: 'dall-e-3',
+    tier: 'paid',
   },
   {
     id: 'fal-flux-dev',
@@ -29,7 +53,9 @@ export const IMAGE_MODELS = [
     provider: 'fal.ai',
     pricePerImage: 0.025,
     description: '사실적·고품질, 세밀한 묘사',
-    speed: '보통'
+    speed: '보통',
+    apiModelId: 'fal-flux-dev',
+    tier: 'paid',
   },
   {
     id: 'fal-flux-schnell',
@@ -37,11 +63,19 @@ export const IMAGE_MODELS = [
     provider: 'fal.ai',
     pricePerImage: 0.003,
     description: '초고속·저렴, 스케치/초안용',
-    speed: '빠름'
+    speed: '빠름',
+    apiModelId: 'fal-flux-schnell',
+    tier: 'paid',
   },
 ] as const;
 
 export type ImageModelId = typeof IMAGE_MODELS[number]['id'];
+
+// 모델 ID → API 모델 ID 매핑 헬퍼
+export const getApiModelId = (modelId: ImageModelId): string => {
+  const model = IMAGE_MODELS.find(m => m.id === modelId);
+  return (model as any)?.apiModelId ?? modelId;
+};
 
 // Gemini 전용 스타일 카테고리 (3가지 핵심 화풍)
 export const GEMINI_STYLE_CATEGORIES = [
@@ -135,7 +169,7 @@ export const CONFIG = {
   // 기본 설정값들 (키 제외)
   DEFAULT_VOICE_ID: "21m00Tcm4TlvDq8ikWAM",  // Rachel - 기본 음성 목록에 포함된 유효한 ID
   DEFAULT_ELEVENLABS_MODEL: "eleven_multilingual_v2" as ElevenLabsModelId,
-  DEFAULT_IMAGE_MODEL: "gemini-2.5-flash-image" as ImageModelId,
+  DEFAULT_IMAGE_MODEL: "gemini-2.0-flash-image" as ImageModelId,
   VIDEO_WIDTH: 1280,
   VIDEO_HEIGHT: 720,
 
