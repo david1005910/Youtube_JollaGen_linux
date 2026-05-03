@@ -173,7 +173,7 @@ ${fetchedContext ? `\n## 조회된 데이터\n${fetchedContext}` : '\nURL/검색
     }
 
     const streamResult = await ai.models.generateContentStream({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       contents,
       config: { systemInstruction, maxOutputTokens: 8192, temperature: 0.7 },
     });
