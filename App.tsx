@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Header from './components/Header';
-import InputSection from './components/InputSection';
+import MainStudio from './components/MainStudio';
 import ResultTable from './components/ResultTable';
 import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceImages, DEFAULT_REFERENCE_IMAGES } from './types';
 import {
@@ -22,7 +22,6 @@ import ProjectGallery from './components/ProjectGallery';
 import YouTubeSkillChat from './components/YouTubeSkillChat';
 import RemotionPreview from './components/RemotionPreview';
 import YouTubeClipperChat from './components/YouTubeClipperChat';
-import ScriptStudio from './components/ScriptStudio';
 import * as FileSaver from 'file-saver';
 
 const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
@@ -47,7 +46,7 @@ function cleanErrorMessage(error: any): string {
   return msg.length > 150 ? msg.slice(0, 150) + '...' : msg;
 }
 
-type ViewMode = 'main' | 'gallery' | 'script';
+type ViewMode = 'main' | 'gallery';
 
 
 const App: React.FC = () => {
@@ -156,7 +155,8 @@ const App: React.FC = () => {
   const handleGenerate = useCallback(async (
     topic: string,
     refImgs: ReferenceImages,
-    sourceText: string | null
+    sourceText: string | null,
+    previewedScenes?: ScriptScene[]
   ) => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
@@ -193,26 +193,28 @@ const App: React.FC = () => {
         setProgressMessage(`"${topic}" 스토리보드 생성 중...`);
       }
 
-      setProgressMessage(`스토리보드 및 메타포 생성 중...`);
-
       // 긴 대본(3000자 초과) 감지 시 청크 분할 처리
       const inputLength = sourceText?.length || 0;
-      const CHUNK_THRESHOLD = 3000; // 3000자 초과 시 청크 분할
+      const CHUNK_THRESHOLD = 3000;
 
       let scriptScenes: ScriptScene[];
-      if (inputLength > CHUNK_THRESHOLD) {
-        // 긴 대본: 청크 분할 처리 (10,000자 이상 대응)
+      if (previewedScenes && previewedScenes.length > 0) {
+        // MainStudio에서 미리 생성된 씬 사용 — Gemini 호출 생략
+        setProgressMessage('미리 생성된 스크립트 사용 중...');
+        scriptScenes = previewedScenes;
+      } else if (inputLength > CHUNK_THRESHOLD) {
+        setProgressMessage(`스토리보드 및 메타포 생성 중...`);
         console.log(`[App] 긴 대본 감지: ${inputLength.toLocaleString()}자 → 청크 분할 처리`);
         setProgressMessage(`긴 대본(${inputLength.toLocaleString()}자) 청크 분할 처리 중...`);
         scriptScenes = await generateScriptChunked(
           targetTopic,
           hasRefImages,
           sourceText!,
-          2500, // 청크당 2500자
-          setProgressMessage // 진행 상황 콜백
+          2500,
+          setProgressMessage
         );
       } else {
-        // 일반 대본: 기존 방식
+        setProgressMessage(`스토리보드 및 메타포 생성 중...`);
         scriptScenes = await generateScript(targetTopic, hasRefImages, sourceText);
       }
       if (isAbortedRef.current) return;
@@ -433,116 +435,6 @@ const App: React.FC = () => {
       isProcessingRef.current = false;
     }
   }, [checkApiKeyStatus, refreshProjects]);
-
-  // ScriptStudio에서 "이미지+음성 생성 시작" 클릭 시 — 기존 스크립트를 메인 흐름에 주입
-  const handleStartFromScript = useCallback(async (topic: string, scenes: ScriptScene[]) => {
-    if (isProcessingRef.current) return;
-    isProcessingRef.current = true;
-    isAbortedRef.current = false;
-
-    setViewMode('main');
-    setStep(GenerationStep.ASSETS);
-    setCurrentTopic(topic);
-    resetCost();
-
-    const initialAssets = scenes.map(scene => ({
-      ...scene,
-      imageData: null, audioData: null, audioDuration: null,
-      subtitleData: null, videoData: null, videoDuration: null,
-      status: 'pending' as const,
-    }));
-    assetsRef.current = initialAssets;
-    setGeneratedData(initialAssets);
-    setCurrentReferenceImages(DEFAULT_REFERENCE_IMAGES);
-
-    // 기존 handleGenerate의 runAudio/runImages 로직을 재사용하기 위해
-    // sourceText 없이 이미 생성된 scenes를 바로 에셋 생성 단계로 넘김
-    const IMAGE_DELAY = 2000;
-    const MAX_IMAGE_RETRIES = 2;
-
-    const runAudio = async () => {
-      const TTS_DELAY = 1500;
-      const MAX_TTS_RETRIES = 2;
-      for (let i = 0; i < initialAssets.length; i++) {
-        if (isAbortedRef.current) break;
-        setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 음성 생성 중...`);
-        let success = false;
-        for (let attempt = 0; attempt <= MAX_TTS_RETRIES && !success; attempt++) {
-          if (isAbortedRef.current) break;
-          try {
-            if (attempt > 0) await wait(3000);
-            const elResult = await generateAudioWithElevenLabs(assetsRef.current[i].narration);
-            if (elResult?.audioData && !isAbortedRef.current) {
-              addCost('tts', elResult.audioData.length * PRICING.TTS.perCharacter / 4, assetsRef.current[i].narration.length);
-              updateAssetAt(i, {
-                audioData: elResult.audioData,
-                audioDuration: elResult.estimatedDuration || null,
-                subtitleData: elResult.subtitleData || null,
-                status: 'completed',
-              });
-              success = true;
-            }
-          } catch (e: any) {
-            if (attempt === MAX_TTS_RETRIES) {
-              try {
-                const fallback = await generateAudioForScene(assetsRef.current[i].narration);
-                if (fallback) updateAssetAt(i, { audioData: fallback, status: 'completed' });
-              } catch {}
-            }
-          }
-        }
-        if (i < initialAssets.length - 1) await wait(TTS_DELAY);
-      }
-    };
-
-    const runImages = async () => {
-      for (let i = 0; i < initialAssets.length; i++) {
-        if (isAbortedRef.current) break;
-        setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 이미지 생성 중...`);
-        updateAssetAt(i, { status: 'generating' });
-        let success = false;
-        for (let attempt = 0; attempt <= MAX_IMAGE_RETRIES && !success; attempt++) {
-          if (isAbortedRef.current) break;
-          try {
-            if (attempt > 0) await wait(5000 * attempt);
-            const img = await generateImage(assetsRef.current[i], DEFAULT_REFERENCE_IMAGES);
-            if (img && !isAbortedRef.current) {
-              const imageModel = getSelectedImageModel();
-              const imagePrice = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0;
-              addCost('image', imagePrice, 1);
-              updateAssetAt(i, { imageData: img, status: 'completed' });
-              success = true;
-            }
-          } catch (e: any) {
-            if (attempt === MAX_IMAGE_RETRIES) updateAssetAt(i, { status: 'error' });
-          }
-        }
-        if (i < initialAssets.length - 1 && !isAbortedRef.current) await wait(IMAGE_DELAY);
-      }
-    };
-
-    try {
-      setProgressMessage('시각 에셋 및 오디오 합성 중...');
-      await Promise.all([runAudio(), runImages()]);
-      if (isAbortedRef.current) return;
-      setStep(GenerationStep.COMPLETED);
-      const cost = costRef.current;
-      const costMsg = `이미지 ${cost.imageCount}장 ${formatKRW(cost.images)} + TTS ${cost.ttsCharacters}자 ${formatKRW(cost.tts)} = 총 ${formatKRW(cost.total)}`;
-      setProgressMessage(`생성 완료! ${costMsg}`);
-      try {
-        const savedProject = await saveProject(topic, assetsRef.current, undefined, costRef.current);
-        refreshProjects();
-        setProgressMessage(`"${savedProject.name}" 저장됨 | ${costMsg}`);
-      } catch {}
-    } catch (error: any) {
-      if (!isAbortedRef.current) {
-        setStep(GenerationStep.ERROR);
-        setProgressMessage(`❌ ${cleanErrorMessage(error)}`);
-      }
-    } finally {
-      isProcessingRef.current = false;
-    }
-  }, [refreshProjects]);
 
   // 이미지 재생성 핸들러 (useCallback으로 메모이제이션)
   const handleRegenerateImage = useCallback(async (idx: number) => {
@@ -775,27 +667,6 @@ const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setViewMode('script')}
-            style={{
-              padding: '12px 16px', fontSize: 14, fontWeight: 600,
-              background: 'none', border: 'none', cursor: 'pointer',
-              position: 'relative', transition: 'color 0.2s',
-              color: viewMode === 'script' ? '#fff' : 'rgba(255,255,255,0.45)',
-              textShadow: viewMode === 'script' ? '0px 1px 3px rgba(0,0,0,0.25)' : 'none',
-              letterSpacing: '0.02em',
-            }}
-          >
-            자막 & 프롬프트
-            {viewMode === 'script' && (
-              <div style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
-                background: `linear-gradient(90deg, #06B6D4, #8B5CF6)`,
-                borderRadius: 2,
-              }} />
-            )}
-          </button>
-
-          <button
             onClick={() => setViewMode('gallery')}
             style={{
               padding: '12px 16px', fontSize: 14, fontWeight: 600,
@@ -909,11 +780,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* 자막 & 프롬프트 스튜디오 */}
-      {viewMode === 'script' && (
-        <ScriptStudio onStartFullGeneration={handleStartFromScript} />
-      )}
-
       {/* 갤러리 뷰 */}
       {viewMode === 'gallery' && (
         <ProjectGallery
@@ -928,7 +794,7 @@ const App: React.FC = () => {
       {/* 메인 뷰 */}
       {viewMode === 'main' && (
         <main style={{ paddingTop: 32, paddingBottom: 48, position: 'relative', zIndex: 1 }}>
-          <InputSection onGenerate={handleGenerate} step={step} />
+          <MainStudio step={step} onStartFullGeneration={handleGenerate} />
 
           {step !== GenerationStep.IDLE && (
             <div style={{ maxWidth: 1280, margin: '0 auto 48px', padding: '0 16px', textAlign: 'center' }}>
