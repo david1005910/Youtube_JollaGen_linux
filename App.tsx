@@ -266,7 +266,7 @@ const App: React.FC = () => {
                         throw new Error('ElevenLabs 응답 없음');
                       }
                   } catch (e: any) {
-                      console.error(`[TTS] 씬 ${i + 1} 실패 (시도 ${attempt + 1}):`, e.message);
+                      console.warn(`[TTS] 씬 ${i + 1} 실패 (시도 ${attempt + 1}):`, e.message);
 
                       // Rate Limit 에러인 경우 더 긴 대기
                       if (e.message?.includes('429') || e.message?.includes('rate')) {
@@ -282,7 +282,7 @@ const App: React.FC = () => {
                       const fallbackAudio = await generateAudioForScene(assetsRef.current[i].narration);
                       updateAssetAt(i, { audioData: fallbackAudio });
                   } catch (fallbackError) {
-                      console.error(`[TTS] 씬 ${i + 1} Gemini 폴백도 실패:`, fallbackError);
+                      console.warn(`[TTS] 씬 ${i + 1} Gemini 폴백도 실패:`, fallbackError);
                   }
               }
 
@@ -327,7 +327,7 @@ const App: React.FC = () => {
                       }
                   } catch (e: any) {
                       lastError = e;
-                      console.error(`씬 ${i + 1} 이미지 생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
+                      console.warn(`씬 ${i + 1} 이미지 생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
 
                       // API 키 오류는 재시도하지 않음
                       if (e.message?.includes("API key not valid") || e.status === 400) {
@@ -339,15 +339,15 @@ const App: React.FC = () => {
                       const isQuota = e.message?.includes('할당량') || e.message?.includes('quota') ||
                         e.message?.includes('RESOURCE_EXHAUSTED') || e.message?.includes('429');
                       if (isQuota && attempt < MAX_RETRIES) {
-                          setProgressMessage(`씬 ${i + 1} API 할당량 초과 — ${15}초 대기 후 재시도...`);
-                          await wait(15000);
+                          setProgressMessage(`씬 ${i + 1} API 할당량 초과 — 20초 대기 후 재시도...`);
+                          await wait(20000);
                       }
                   }
               }
 
               if (!success && !isAbortedRef.current) {
                   updateAssetAt(i, { status: 'error' });
-                  console.error(`씬 ${i + 1} 이미지 생성 최종 실패:`, lastError?.message);
+                  console.warn(`씬 ${i + 1} 이미지 생성 최종 실패:`, lastError?.message);
               }
 
               // 다음 씬 전에 딜레이 (Gemini 이미지 RPM 제한 방지)
@@ -390,7 +390,7 @@ const App: React.FC = () => {
               console.log(`[Animation] 씬 ${i + 1} 영상 변환 완료`);
             }
           } catch (e: any) {
-            console.error(`[Animation] 씬 ${i + 1} 변환 실패:`, e.message);
+            console.warn(`[Animation] 씬 ${i + 1} 변환 실패:`, e.message);
           }
 
           // API rate limit 방지
@@ -421,7 +421,7 @@ const App: React.FC = () => {
         refreshProjects();
         setProgressMessage(`"${savedProject.name}" 저장됨 | ${costMsg}`);
       } catch (e) {
-        console.error('프로젝트 자동 저장 실패:', e);
+        console.warn('프로젝트 자동 저장 실패:', e);
       }
 
     } catch (error: any) {
@@ -577,7 +577,7 @@ const App: React.FC = () => {
           throw new Error('이미지 데이터가 비어있습니다');
         }
       } catch (e: any) {
-        console.error(`씬 ${idx + 1} 재생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
+        console.warn(`씬 ${idx + 1} 재생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
 
         if (e.message?.includes("API key not valid") || e.status === 400) {
           setNeedsKey(true);
@@ -629,7 +629,7 @@ const App: React.FC = () => {
         setProgressMessage(`씬 ${idx + 1} 영상 변환 실패`);
       }
     } catch (e: any) {
-      console.error('영상 변환 실패:', e);
+      console.warn('영상 변환 실패:', e);
       setProgressMessage(`❌ 씬 ${idx + 1} 오류: ${cleanErrorMessage(e)}`);
     } finally {
       // Set에서 현재 인덱스 제거
