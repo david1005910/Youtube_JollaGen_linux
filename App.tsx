@@ -251,6 +251,12 @@ const App: React.FC = () => {
                       );
                       if (isAbortedRef.current) break;
 
+                      // 유료 보이스 필요 → 재시도 없이 즉시 Gemini TTS로 전환
+                      if (elResult.skipRetry) {
+                        console.warn(`[TTS] 씬 ${i + 1} ElevenLabs 유료 보이스 → Gemini TTS로 전환`);
+                        break;
+                      }
+
                       if (elResult.audioData) {
                         // ElevenLabs 성공: 오디오 + 자막 + 길이 데이터 저장
                         updateAssetAt(i, {

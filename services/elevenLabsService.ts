@@ -34,6 +34,7 @@ export interface ElevenLabsResult {
   audioData: string | null;
   subtitleData: SubtitleData | null;
   estimatedDuration: number | null;  // 추정 오디오 길이 (초)
+  skipRetry?: boolean; // true = 유료 플랜 필요, 재시도 없이 Gemini TTS로 전환
 }
 
 /**
@@ -185,7 +186,12 @@ export const generateAudioWithElevenLabs = async (
 
     if (!response.ok) {
       const errorDetail = await response.text();
-      console.error("ElevenLabs API Error:", errorDetail);
+      console.warn("ElevenLabs API Error:", errorDetail);
+      // 유료 플랜 필요 에러 → 즉시 Gemini TTS로 전환 (재시도 불필요)
+      if (errorDetail.includes('paid_plan_required') || errorDetail.includes('payment_required')) {
+        console.warn('[ElevenLabs] 유료 보이스 감지 → Gemini TTS로 즉시 전환');
+        return { audioData: null, subtitleData: null, estimatedDuration: null, skipRetry: true };
+      }
       return { audioData: null, subtitleData: null, estimatedDuration: null };
     }
 
@@ -240,7 +246,7 @@ export const generateAudioWithElevenLabs = async (
     };
 
   } catch (error) {
-    console.error("ElevenLabs Generation Failed:", error);
+    console.warn("ElevenLabs Generation Failed:", error);
     return { audioData: null, subtitleData: null, estimatedDuration: null };
   }
 };
