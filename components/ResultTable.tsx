@@ -114,7 +114,7 @@ const AudioPlayer: React.FC<{ base64: string }> = memo(({ base64 }) => {
       source.onended = () => setIsPlaying(false);
       source.start();
       sourceRef.current = source;
-    } catch (error) { console.error(error); setIsPlaying(false); }
+    } catch (error) { console.warn(error); setIsPlaying(false); }
   };
 
   return (

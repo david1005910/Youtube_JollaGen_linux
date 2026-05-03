@@ -135,7 +135,7 @@ export async function getSavedProjects(): Promise<SavedProject[]> {
       request.onerror = () => reject(request.error);
     });
   } catch (e) {
-    console.error('[Project] 프로젝트 목록 로드 실패:', e);
+    console.warn('[Project] 프로젝트 목록 로드 실패:', e);
     return [];
   }
 }
@@ -155,7 +155,7 @@ export async function getProjectById(id: string): Promise<SavedProject | null> {
       request.onerror = () => reject(request.error);
     });
   } catch (e) {
-    console.error('[Project] 프로젝트 로드 실패:', e);
+    console.warn('[Project] 프로젝트 로드 실패:', e);
     return null;
   }
 }
@@ -178,7 +178,7 @@ export async function deleteProject(id: string): Promise<boolean> {
       request.onerror = () => reject(request.error);
     });
   } catch (e) {
-    console.error('[Project] 프로젝트 삭제 실패:', e);
+    console.warn('[Project] 프로젝트 삭제 실패:', e);
     return false;
   }
 }
@@ -206,7 +206,7 @@ export async function renameProject(id: string, newName: string): Promise<boolea
       request.onerror = () => reject(request.error);
     });
   } catch (e) {
-    console.error('[Project] 프로젝트 이름 변경 실패:', e);
+    console.warn('[Project] 프로젝트 이름 변경 실패:', e);
     return false;
   }
 }
@@ -286,7 +286,7 @@ export async function migrateFromLocalStorage(): Promise<number> {
 
     return migrated;
   } catch (e) {
-    console.error('[Project] 마이그레이션 실패:', e);
+    console.warn('[Project] 마이그레이션 실패:', e);
     return 0;
   }
 }

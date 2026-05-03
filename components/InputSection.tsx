@@ -87,7 +87,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
       try {
         setProjects(JSON.parse(savedProjects));
       } catch (e) {
-        console.error('프로젝트 로드 실패:', e);
+        console.warn('프로젝트 로드 실패:', e);
       }
     }
 
@@ -124,7 +124,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
       const voiceList = await fetchElevenLabsVoices();
       setVoices(voiceList);
     } catch (e) {
-      console.error('음성 목록 로드 실패:', e);
+      console.warn('음성 목록 로드 실패:', e);
     } finally {
       setIsLoadingVoices(false);
     }
@@ -188,7 +188,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
       audioRef.current = audio;
 
       audio.play().catch(err => {
-        console.error('음성 재생 실패:', err);
+        console.warn('음성 재생 실패:', err);
         setPlayingVoiceId(null);
       });
 
@@ -199,7 +199,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
       };
 
     } catch (error) {
-      console.error('미리듣기 생성 실패:', error);
+      console.warn('미리듣기 생성 실패:', error);
       alert(`"${voiceName}" 미리듣기 생성에 실패했습니다.`);
       setPlayingVoiceId(null);
     }

@@ -675,13 +675,13 @@ const App: React.FC = () => {
 
   // 프로젝트 불러오기 핸들러
   const handleLoadProject = (project: SavedProject) => {
-    // 저장된 에셋을 현재 상태로 로드
-    assetsRef.current = project.assets;
-    setGeneratedData([...project.assets]);
+    const assets = Array.isArray(project.assets) ? project.assets : [];
+    assetsRef.current = assets;
+    setGeneratedData([...assets]);
     setCurrentTopic(project.topic);
     setStep(GenerationStep.COMPLETED);
     setProgressMessage(`"${project.name}" 프로젝트 불러옴`);
-    setViewMode('main'); // 메인 뷰로 전환
+    setViewMode('main');
   };
 
   /* ── Glassmorphism — palette constants ────────────────────────────────── */
