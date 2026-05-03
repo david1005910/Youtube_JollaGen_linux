@@ -12,15 +12,15 @@ import { SYSTEM_INSTRUCTIONS, getTrendSearchPrompt, getScriptGenerationPrompt } 
 
 const FAST_MODEL  = 'claude-haiku-4-5-20251001';  // 빠른 작업 (트렌드, 자막, 모션)
 const SMART_MODEL = 'claude-sonnet-4-6';           // 스크립트 생성
-const GEMINI_FALLBACK = 'gemini-2.5-flash';        // Claude 크레딧 부족 시 폴백
+// Claude 크레딧 부족 시 순서대로 시도 (2.0-flash: 1500/day 무료, 2.5-flash: 20/day 무료)
+const GEMINI_FALLBACK_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
 
 let _client: Anthropic | null = null;
 let _gemini: GoogleGenAI | null = null;
 
-function getClient(): Anthropic {
-  if (!_client) {
-    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
-  }
+function getClient(): Anthropic | null {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  if (!_client) _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   return _client;
 }
 
@@ -30,26 +30,44 @@ function getGemini(): GoogleGenAI | null {
   return _gemini;
 }
 
-function isClaudeCreditsError(err: any): boolean {
-  const msg: string = err?.message ?? '';
+function isQuotaOrCreditsError(err: any): boolean {
+  const msg: string = (err?.message ?? '') + JSON.stringify(err?.error ?? '');
   const status: number = err?.status ?? 0;
   return (
     msg.includes('credit balance') ||
     msg.includes('insufficient_quota') ||
     msg.includes('billing') ||
+    msg.includes('RESOURCE_EXHAUSTED') ||
+    msg.includes('quota') ||
+    msg.includes('429') ||
+    status === 429 ||
     (status === 400 && msg.includes('invalid_request_error'))
   );
 }
 
 async function callGeminiFallback(system: string, userPrompt: string): Promise<string> {
   const ai = getGemini();
-  if (!ai) throw new Error('Gemini API key not set — Claude 크레딧을 충전하거나 GEMINI_API_KEY를 설정하세요');
-  console.warn('[Claude→Gemini 폴백] Claude 크레딧 부족 — Gemini Flash로 전환');
-  const response = await ai.models.generateContent({
-    model: GEMINI_FALLBACK,
-    contents: `${system}\n\n${userPrompt}`,
-  });
-  return response.text ?? '';
+  if (!ai) throw new Error('API 크레딧 부족. ANTHROPIC_API_KEY 크레딧을 충전하거나 GEMINI_API_KEY를 설정하세요.');
+
+  for (const model of GEMINI_FALLBACK_MODELS) {
+    try {
+      console.warn(`[Claude→Gemini 폴백] ${model} 시도`);
+      const response = await ai.models.generateContent({
+        model,
+        contents: `${system}\n\n${userPrompt}`,
+      });
+      const text = response.text ?? '';
+      if (text) return text;
+    } catch (e: any) {
+      const msg = e?.message ?? '';
+      if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('429')) {
+        console.warn(`[Gemini 폴백] ${model} 할당량 초과 → 다음 모델 시도`);
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw new Error('Claude 크레딧 부족 + Gemini 할당량 초과. API 크레딧을 충전하세요. (console.anthropic.com)');
 }
 
 function cleanJsonResponse(text: string): string {
@@ -86,20 +104,27 @@ async function callClaude(
   model: string = SMART_MODEL,
   maxTokens: number = 8192
 ): Promise<string> {
-  try {
-    const msg = await getClient().messages.create({
-      model,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
-    return msg.content[0].type === 'text' ? msg.content[0].text : '';
-  } catch (err: any) {
-    if (isClaudeCreditsError(err)) {
-      return callGeminiFallback(system, userPrompt);
+  const client = getClient();
+  if (client) {
+    try {
+      const msg = await client.messages.create({
+        model,
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+      return msg.content[0].type === 'text' ? msg.content[0].text : '';
+    } catch (err: any) {
+      if (isQuotaOrCreditsError(err)) {
+        console.warn('[Claude] 크레딧 부족 → Gemini 폴백');
+      } else {
+        throw err;
+      }
     }
-    throw err;
+  } else {
+    console.warn('[Claude] ANTHROPIC_API_KEY 없음 → Gemini 폴백');
   }
+  return callGeminiFallback(system, userPrompt);
 }
 
 // ── 트렌드 검색 ────────────────────────────────────────────────────────────
