@@ -121,7 +121,7 @@ export const generateImage = async (
     return imageData;
   }
 
-  if (modelId === 'fal-flux-dev' || modelId === 'fal-flux-schnell') {
+  if (modelId.startsWith('fal-')) {
     const { imageData } = await apiFetch<{ imageData: string | null }>(
       '/api/fal/image',
       { prompt: scene.visualPrompt, stylePrompt, modelId }

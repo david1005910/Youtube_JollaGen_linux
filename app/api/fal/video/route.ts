@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const videoUrl = await generateVideoFromImage(imageBase64, motionPrompt);
     return NextResponse.json({ videoUrl });
   } catch (e: any) {
-    console.error('[API] fal/video error:', e.message);
+    console.warn('[API] fal/video error:', e.message);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

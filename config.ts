@@ -48,6 +48,26 @@ export const IMAGE_MODELS = [
     tier: 'paid',
   },
   {
+    id: 'fal-imagen-3',
+    name: 'Google Imagen 3 (fal.ai)',
+    provider: 'fal.ai',
+    pricePerImage: 0.04,
+    description: '구글 최고 품질 이미지, FAL API 키 사용',
+    speed: '보통',
+    apiModelId: 'fal-ai/imagen3',
+    tier: 'paid',
+  },
+  {
+    id: 'fal-imagen-4',
+    name: 'Google Imagen 4 (fal.ai)',
+    provider: 'fal.ai',
+    pricePerImage: 0.06,
+    description: '구글 최신 플래그십 이미지, FAL API 키 사용',
+    speed: '보통',
+    apiModelId: 'fal-ai/imagen4/preview',
+    tier: 'paid',
+  },
+  {
     id: 'fal-flux-dev',
     name: 'FLUX.1 Dev',
     provider: 'fal.ai',
@@ -112,6 +132,8 @@ export const PRICING = {
   IMAGE: {
     'gemini-2.5-flash-image': 0.0315,
     'dall-e-3': 0.04,
+    'fal-imagen-3': 0.04,
+    'fal-imagen-4': 0.06,
     'fal-flux-dev': 0.025,
     'fal-flux-schnell': 0.003,
   },
@@ -119,9 +141,9 @@ export const PRICING = {
   TTS: {
     perCharacter: 0.00003,  // 약 $0.03/1000자 (추정)
   },
-  // 영상 생성 (PixVerse)
+  // 영상 생성 (Veo 3)
   VIDEO: {
-    perVideo: 0.15,  // $0.15/video (5초)
+    perVideo: 0.50,  // ~$0.50/video (8초, Veo 3)
   }
 } as const;
 

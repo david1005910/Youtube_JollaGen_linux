@@ -1,12 +1,12 @@
 
 /**
  * fal.ai API 서비스
- * - PixVerse v5.5 이미지→영상 변환 (~$0.15/영상)
+ * - Veo 3 이미지→영상 변환 (~$0.50/영상, 8초)
  */
 
 import { CONFIG } from '../config';
 
-interface PixVerseVideoResponse {
+interface VideoResponse {
   video: {
     url: string;
   };
@@ -52,11 +52,11 @@ function base64ToBytes(base64: string): Uint8Array {
 }
 
 /**
- * 이미지를 영상으로 변환 (PixVerse v5.5)
+ * 이미지를 영상으로 변환 (Google Veo 3)
  *
  * @param imageBase64 - base64 인코딩된 이미지
  * @param motionPrompt - 움직임을 설명하는 프롬프트
- * @param apiKey - FAL API 키 (선택, 없으면 로컬스토리지에서 가져옴)
+ * @param apiKey - FAL API 키 (선택, 없으면 환경변수에서 가져옴)
  * @returns 생성된 영상 URL 또는 null
  */
 export async function generateVideoFromImage(
@@ -76,27 +76,23 @@ export async function generateVideoFromImage(
     const imageUrl = await uploadImageToFal(imageBase64, key);
 
     if (!imageUrl) {
-      console.error('[FAL] 이미지 업로드 실패');
+      console.warn('[FAL] 이미지 업로드 실패');
       return null;
     }
 
-    console.log(`[FAL] PixVerse v5.5 영상 생성 시작: "${motionPrompt.slice(0, 50)}..."`);
-
-    console.log('[FAL] API 요청 시작...');
-    console.log('[FAL] 이미지 URL:', imageUrl?.slice(0, 100) + '...');
+    console.log(`[FAL] Veo 3 영상 생성 시작: "${motionPrompt.slice(0, 50)}..."`);
 
     const requestBody = {
       prompt: motionPrompt,
       image_url: imageUrl,
-      duration: 5,              // 5초 영상
+      duration: '8s',
       aspect_ratio: '16:9',
-      resolution: '720p',       // 720p 품질
-      negative_prompt: 'blurry, low quality, low resolution, pixelated, noisy, grainy, distorted, static'
+      resolution: '720p',
+      generate_audio: false,
+      safety_tolerance: '4',
     };
 
-    console.log('[FAL] 요청 바디:', JSON.stringify(requestBody).slice(0, 200) + '...');
-
-    const response = await fetch('https://fal.run/fal-ai/pixverse/v5.5/image-to-video', {
+    const response = await fetch('https://fal.run/fal-ai/veo3/image-to-video', {
       method: 'POST',
       headers: {
         'Authorization': `Key ${key}`,
@@ -105,21 +101,19 @@ export async function generateVideoFromImage(
       body: JSON.stringify(requestBody)
     });
 
-    console.log('[FAL] 응답 상태:', response.status, response.statusText);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[FAL] API 오류 (${response.status}):`, errorText);
+      console.warn(`[FAL] Veo3 API 오류 (${response.status}):`, errorText);
       throw new Error(`FAL API 오류: ${response.status} - ${errorText.slice(0, 200)}`);
     }
 
-    const result: PixVerseVideoResponse = await response.json();
-    console.log(`[FAL] 영상 생성 완료: ${result.video.url}`);
+    const result: VideoResponse = await response.json();
+    console.log(`[FAL] Veo 3 영상 생성 완료: ${result.video.url}`);
 
     return result.video.url;
 
   } catch (error: any) {
-    console.error('[FAL] 영상 생성 실패:', error.message);
+    console.warn('[FAL] 영상 생성 실패:', error.message);
     return null;
   }
 }
