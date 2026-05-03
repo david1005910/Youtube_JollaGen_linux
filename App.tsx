@@ -22,7 +22,6 @@ import ProjectGallery from './components/ProjectGallery';
 import YouTubeSkillChat from './components/YouTubeSkillChat';
 import RemotionPreview from './components/RemotionPreview';
 import YouTubeClipperChat from './components/YouTubeClipperChat';
-import ScriptStudio from './components/ScriptStudio';
 import GeminiChatModal from './components/GeminiChatModal';
 import * as FileSaver from 'file-saver';
 
@@ -48,7 +47,7 @@ function cleanErrorMessage(error: any): string {
   return msg.length > 150 ? msg.slice(0, 150) + '...' : msg;
 }
 
-type ViewMode = 'main' | 'gallery' | 'script';
+type ViewMode = 'main' | 'gallery';
 
 
 const App: React.FC = () => {
@@ -791,27 +790,6 @@ const App: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setViewMode('script')}
-            style={{
-              padding: '12px 16px', fontSize: 14, fontWeight: 600,
-              background: 'none', border: 'none', cursor: 'pointer',
-              position: 'relative', transition: 'color 0.2s',
-              color: viewMode === 'script' ? '#fff' : 'rgba(255,255,255,0.45)',
-              textShadow: viewMode === 'script' ? '0px 1px 3px rgba(0,0,0,0.25)' : 'none',
-              letterSpacing: '0.02em',
-            }}
-          >
-            자막 & 프롬프트
-            {viewMode === 'script' && (
-              <div style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
-                background: `linear-gradient(90deg, #06B6D4, #8B5CF6)`,
-                borderRadius: 2,
-              }} />
-            )}
-          </button>
-
-          <button
             onClick={() => setViewMode('gallery')}
             style={{
               padding: '12px 16px', fontSize: 14, fontWeight: 600,
@@ -943,11 +921,6 @@ const App: React.FC = () => {
             API 키 설정
           </button>
         </div>
-      )}
-
-      {/* 자막 & 프롬프트 스튜디오 */}
-      {viewMode === 'script' && (
-        <ScriptStudio onStartFullGeneration={handleStartFromScript} />
       )}
 
       {/* 갤러리 뷰 */}
