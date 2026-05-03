@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateScript } from '@/services/geminiService';
+import { generateScript } from '@/services/claudeService';
 
 export const maxDuration = 120;
 
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const scenes = await generateScript(topic, hasReferenceImage ?? false, sourceContext);
     return NextResponse.json(scenes);
   } catch (e: any) {
-    console.error('[API] gemini/script error:', e.message);
+    console.warn('[API] gemini/script error:', e.message);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

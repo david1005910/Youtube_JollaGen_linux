@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.92.0",
     "@google/genai": "^1.33.0",
     "@remotion/bundler": "^4.0.456",
     "@remotion/cli": "^4.0.456",

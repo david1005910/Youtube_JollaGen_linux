@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findTrendingTopics } from '@/services/geminiService';
+import { findTrendingTopics } from '@/services/claudeService';
 
 export const maxDuration = 60;
 
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const result = await findTrendingTopics(category, usedTopics ?? []);
     return NextResponse.json(result);
   } catch (e: any) {
-    console.error('[API] gemini/trends error:', e.message);
+    console.warn('[API] gemini/trends error:', e.message);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

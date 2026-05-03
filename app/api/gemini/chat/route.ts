@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
+import Anthropic from '@anthropic-ai/sdk';
 
 export const maxDuration = 60;
 
@@ -44,37 +44,40 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: 'Invalid request' }), { status: 400 });
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
-    const contents = messages
-      .filter((_: any, i: number) => !(i === 0 && messages[0]?.role === 'assistant'))
-      .map((m: { role: string; content: string }) => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.content }],
-      }));
+    // 첫 번째 assistant 환영 메시지 제거 (Claude는 user 메시지로 시작해야 함)
+    const filtered = messages.filter(
+      (_: any, i: number) => !(i === 0 && messages[0]?.role === 'assistant')
+    );
 
-    if (contents.length === 0) {
+    const claudeMessages = filtered.map((m: { role: string; content: string }) => ({
+      role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: m.content,
+    }));
+
+    if (claudeMessages.length === 0 || claudeMessages[0].role !== 'user') {
       return new Response(JSON.stringify({ error: 'No user messages' }), { status: 400 });
     }
-
-    const streamResult = await ai.models.generateContentStream({
-      model: 'gemini-2.5-flash',
-      contents,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        maxOutputTokens: 8192,
-        temperature: 0.7,
-      },
-    });
 
     const readable = new ReadableStream({
       async start(controller) {
         const enc = new TextEncoder();
         try {
-          for await (const chunk of streamResult) {
-            const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-            if (text) {
-              controller.enqueue(enc.encode(`data: ${JSON.stringify({ text })}\n\n`));
+          const stream = client.messages.stream({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 8192,
+            system: SYSTEM_INSTRUCTION,
+            messages: claudeMessages,
+          });
+
+          for await (const event of stream) {
+            if (
+              event.type === 'content_block_delta' &&
+              event.delta.type === 'text_delta' &&
+              event.delta.text
+            ) {
+              controller.enqueue(enc.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`));
             }
           }
           controller.enqueue(enc.encode('data: [DONE]\n\n'));
@@ -94,7 +97,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (e: any) {
-    console.warn('[Gemini Chat API]', e);
+    console.warn('[Claude Chat API]', e);
     return new Response(JSON.stringify({ error: e.message }), { status: 500 });
   }
 }
