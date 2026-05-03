@@ -1099,7 +1099,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
           </div>
 
           {/* Gemini 화풍 선택 */}
-          {(imageModelId === 'gemini-2.5-flash-image' || imageModelId === 'gemini-2.0-flash-image' || imageModelId === 'gemini-3-pro-image') && (
+          {imageModelId === 'gemini-2.0-flash-image' && (
             <div className="mt-4 pt-4 border-t border-slate-700">
               {/* 화풍 선택 헤더 */}
               <div className="flex items-center justify-between mb-4">

@@ -113,14 +113,6 @@ export const generateImage = async (
   const modelId = getSelectedImageModel();
   const stylePrompt = getGeminiStylePrompt();
 
-  if (modelId === 'dall-e-3') {
-    const { imageData } = await apiFetch<{ imageData: string | null }>(
-      '/api/openai/image',
-      { prompt: scene.visualPrompt, stylePrompt }
-    );
-    return imageData;
-  }
-
   if (modelId.startsWith('fal-')) {
     const { imageData } = await apiFetch<{ imageData: string | null }>(
       '/api/fal/image',
