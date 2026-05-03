@@ -23,6 +23,7 @@ import YouTubeSkillChat from './components/YouTubeSkillChat';
 import RemotionPreview from './components/RemotionPreview';
 import YouTubeClipperChat from './components/YouTubeClipperChat';
 import ScriptStudio from './components/ScriptStudio';
+import GeminiChatModal from './components/GeminiChatModal';
 import * as FileSaver from 'file-saver';
 
 const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
@@ -67,6 +68,7 @@ const App: React.FC = () => {
   const [showYoutubeSkills, setShowYoutubeSkills] = useState(false);
   const [showRemotionPreview, setShowRemotionPreview] = useState(false);
   const [showClipper, setShowClipper] = useState(false);
+  const [showGeminiChat, setShowGeminiChat] = useState(false);
 
   // 비용 추적
   const [currentCost, setCurrentCost] = useState<CostBreakdown | null>(null);
@@ -544,6 +546,12 @@ const App: React.FC = () => {
     }
   }, [refreshProjects]);
 
+  // GeminiChat에서 스크립트 수신 → handleStartFromScript 위임
+  const handleGeminiScenes = useCallback((topic: string, scenes: ScriptScene[]) => {
+    setShowGeminiChat(false);
+    handleStartFromScript(topic, scenes);
+  }, [handleStartFromScript]);
+
   // 이미지 재생성 핸들러 (useCallback으로 메모이제이션)
   const handleRegenerateImage = useCallback(async (idx: number) => {
     if (isProcessingRef.current) return;
@@ -744,6 +752,14 @@ const App: React.FC = () => {
         <YouTubeClipperChat onClose={() => setShowClipper(false)} />
       )}
 
+      {/* Gemini 스크립트 생성 채팅 모달 */}
+      {showGeminiChat && (
+        <GeminiChatModal
+          onClose={() => setShowGeminiChat(false)}
+          onUseScenes={handleGeminiScenes}
+        />
+      )}
+
       {/* 네비게이션 탭 — glass surface */}
       <div style={{
         background:           'rgba(255,255,255,0.10)',
@@ -830,6 +846,26 @@ const App: React.FC = () => {
 
           {/* 버튼 그룹 */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', marginRight: 4, marginTop: 6, marginBottom: 6 }}>
+            {/* Gemini 채팅 버튼 */}
+            <button
+              onClick={() => setShowGeminiChat(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                padding: '8px 18px', borderRadius: 12,
+                background: 'linear-gradient(135deg, rgba(6,182,212,0.65) 0%, rgba(139,92,246,0.60) 100%)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                color: '#fff', fontSize: 13, fontWeight: 700,
+                boxShadow: '0px 4px 24px rgba(0,0,0,0.20), inset 0px 0px 12px rgba(255,255,255,0.12)',
+                letterSpacing: '0.02em',
+                cursor: 'pointer', transition: 'opacity 0.2s',
+                textShadow: '0px 1px 3px rgba(0,0,0,0.25)',
+              }}
+            >
+              ✨ AI 채팅 생성
+            </button>
+
             {/* Clipper 버튼 */}
             <button
               onClick={() => setShowClipper(true)}
