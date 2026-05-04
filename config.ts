@@ -5,6 +5,154 @@
  * 앱 내의 [설정] 메뉴를 통해 입력하면 브라우저에 안전하게 보관됩니다.
  */
 
+// 이미지 생성 모델 목록
+export const IMAGE_MODELS = [
+  // ── Google Gemini ───────────────────────────────────────────────────────
+  {
+    id: 'gemini-2.0-flash-image',
+    name: 'Gemini 2.5 Flash Image (무료)',
+    provider: 'Google',
+    pricePerImage: 0,
+    description: '무료, 빠른 생성, 권장',
+    speed: '빠름',
+    apiModelId: 'gemini-2.5-flash-image',
+    tier: 'free',
+  },
+  // ── fal.ai — Google Imagen ─────────────────────────────────────────────
+  {
+    id: 'fal-imagen-3',
+    name: 'Imagen 3 (fal.ai)',
+    provider: 'fal.ai',
+    pricePerImage: 0.04,
+    description: '구글 고품질 이미지, 자연스러운 묘사',
+    speed: '보통',
+    apiModelId: 'fal-ai/imagen3',
+    tier: 'paid',
+  },
+  {
+    id: 'fal-imagen-4',
+    name: 'Imagen 4 (fal.ai)',
+    provider: 'fal.ai',
+    pricePerImage: 0.06,
+    description: '구글 최신 플래그십, 최고 품질',
+    speed: '보통',
+    apiModelId: 'fal-ai/imagen4/preview',
+    tier: 'paid',
+  },
+  // ── fal.ai — FLUX ─────────────────────────────────────────────────────
+  {
+    id: 'fal-flux-pro-ultra',
+    name: 'FLUX.1 Pro Ultra',
+    provider: 'fal.ai',
+    pricePerImage: 0.06,
+    description: '최고 품질, 4MP 초고해상도, 세밀한 묘사',
+    speed: '느림',
+    apiModelId: 'fal-ai/flux-pro/v1.1-ultra',
+    tier: 'paid',
+  },
+  {
+    id: 'fal-flux-pro',
+    name: 'FLUX.1 Pro v1.1',
+    provider: 'fal.ai',
+    pricePerImage: 0.04,
+    description: '프로급 품질, 사실적 이미지, 균형 잡힌 속도',
+    speed: '보통',
+    apiModelId: 'fal-ai/flux-pro/v1.1',
+    tier: 'paid',
+  },
+  {
+    id: 'fal-flux-dev',
+    name: 'FLUX.1 Dev',
+    provider: 'fal.ai',
+    pricePerImage: 0.025,
+    description: '고품질, 창의적 묘사, 저렴한 비용',
+    speed: '보통',
+    apiModelId: 'fal-ai/flux/dev',
+    tier: 'paid',
+  },
+  // ── fal.ai — Google Nano Banana 2 ─────────────────────────────────────
+  {
+    id: 'fal-nano-banana-2',
+    name: 'Nano Banana 2 (fal.ai)',
+    provider: 'fal.ai',
+    pricePerImage: 0.08,
+    description: 'Google Gemini 3.1 Flash Image 기반, 세밀한 텍스트·로고 렌더링',
+    speed: '빠름',
+    apiModelId: 'fal-ai/nano-banana-2',
+    tier: 'paid',
+  },
+] as const;
+
+export type ImageModelId = typeof IMAGE_MODELS[number]['id'];
+
+// 모델 ID → API 모델 ID 매핑 헬퍼
+export const getApiModelId = (modelId: ImageModelId): string => {
+  const model = IMAGE_MODELS.find(m => m.id === modelId);
+  return (model as any)?.apiModelId ?? modelId;
+};
+
+// Gemini 전용 스타일 카테고리 (3가지 핵심 화풍)
+export const GEMINI_STYLE_CATEGORIES = [
+  {
+    id: 'main',
+    name: '메인 화풍',
+    styles: [
+      {
+        id: 'gemini-crayon',
+        name: '크레용 (기본)',
+        prompt: 'Hand-drawn crayon and colored pencil illustration style, waxy texture with rough organic strokes, warm nostalgic colors, childlike charm with innocent atmosphere, visible pencil texture on outlines and fills, soft analog warmth, 2D flat composition'
+      },
+      {
+        id: 'gemini-korea-cartoon',
+        name: '한국 경제 카툰',
+        prompt: 'Korean economic cartoon style, digital illustration with clean bold black outlines, cel-shaded flat coloring, simple rounded stick figure character (white circle head, dot eyes), strong color contrasts with golden warm highlights vs cool gray tones, Korean text integration, modern webtoon infographic aesthetic, professional news graphic feel, dramatic lighting with sparkles and glow effects, 16:9 cinematic composition'
+      },
+      {
+        id: 'gemini-watercolor',
+        name: '수채화',
+        prompt: 'Soft watercolor illustration style, gentle hand-drawn aesthetic, warm color palette by default, simple stick figure with white circle head and thin black line body, organic brush strokes with paint bleeding effects, soft diffused edges, analog texture. Use cool tones only when danger or twist elements appear. Focus on visualizing the exact meaning and context of the sentence.'
+      },
+    ]
+  }
+] as const;
+
+export type GeminiStyleId = typeof GEMINI_STYLE_CATEGORIES[number]['styles'][number]['id'] | 'gemini-custom' | 'gemini-none';
+
+// 가격 정보 (USD)
+export const PRICING = {
+  // 환율 (USD → KRW)
+  USD_TO_KRW: 1450,
+
+  IMAGE: {
+    'gemini-2.5-flash-image': 0.0315,
+    'dall-e-3': 0.04,
+    'fal-imagen-3': 0.04,
+    'fal-imagen-4': 0.06,
+    'fal-flux-dev': 0.025,
+    'fal-flux-schnell': 0.003,
+    'fal-nano-banana-2': 0.08,
+  },
+  // TTS (ElevenLabs) - 글자당 가격
+  TTS: {
+    perCharacter: 0.00003,  // 약 $0.03/1000자 (추정)
+  },
+  // 영상 생성 (Veo 3)
+  VIDEO: {
+    perVideo: 0.50,  // ~$0.50/video (8초, Veo 3)
+  }
+} as const;
+
+// USD를 KRW로 변환
+export function toKRW(usd: number): number {
+  return Math.round(usd * PRICING.USD_TO_KRW);
+}
+
+// KRW 포맷 (예: 1,234원)
+export function formatKRW(usd: number): string {
+  const krw = toKRW(usd);
+  return krw.toLocaleString('ko-KR') + '원';
+}
+
 // ElevenLabs 자막(타임스탬프) 지원 모델 목록
 export const ELEVENLABS_MODELS = [
   { id: 'eleven_multilingual_v2', name: 'Multilingual v2', description: '다국어 29개, 고품질 (기본값)', supportsTimestamp: true },
@@ -17,10 +165,28 @@ export const ELEVENLABS_MODELS = [
 
 export type ElevenLabsModelId = typeof ELEVENLABS_MODELS[number]['id'];
 
+// ElevenLabs 안정적인 음성 목록 (긴 텍스트에도 에러 없음)
+// 미리듣기는 API Key를 사용해 "테스트 목소리입니다" 문구로 생성됨
+export const ELEVENLABS_DEFAULT_VOICES = [
+  // 여성 음성 (Female) - 안정성 검증된 음성만
+  { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', gender: 'female' as const, accent: 'American', description: '⭐ 가장 안정적, 나레이션 최적화, 긴 텍스트 OK' },
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', gender: 'female' as const, accent: 'American', description: '부드럽고 친근함, 대화형 콘텐츠에 적합' },
+  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', gender: 'female' as const, accent: 'British', description: '세련된 영국식, 고급스러운 나레이션' },
+  // 남성 음성 (Male) - 안정성 검증된 음성만
+  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', gender: 'male' as const, accent: 'American', description: '⭐ 가장 안정적, 뉴스/다큐 스타일, 긴 텍스트 OK' },
+  { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', gender: 'male' as const, accent: 'American', description: '젊고 역동적, 유튜브/엔터테인먼트에 적합' },
+  { id: 'yoZ06aMxZJJ28mfd3POQ', name: 'Sam', gender: 'male' as const, accent: 'American', description: '차분하고 신뢰감, 교육/설명 콘텐츠에 적합' },
+] as const;
+
+// 기본 음성 타입 정의
+export type ElevenLabsDefaultVoice = typeof ELEVENLABS_DEFAULT_VOICES[number];
+export type VoiceGender = 'male' | 'female';
+
 export const CONFIG = {
   // 기본 설정값들 (키 제외)
-  DEFAULT_VOICE_ID: "qilwn0AtH88Ij5OirLPw",
+  DEFAULT_VOICE_ID: "21m00Tcm4TlvDq8ikWAM",  // Rachel - 기본 음성 목록에 포함된 유효한 ID
   DEFAULT_ELEVENLABS_MODEL: "eleven_multilingual_v2" as ElevenLabsModelId,
+  DEFAULT_IMAGE_MODEL: "gemini-2.0-flash-image" as ImageModelId,
   VIDEO_WIDTH: 1280,
   VIDEO_HEIGHT: 720,
 
@@ -29,7 +195,12 @@ export const CONFIG = {
     ELEVENLABS_API_KEY: 'tubegen_el_key',
     ELEVENLABS_VOICE_ID: 'tubegen_el_voice',
     ELEVENLABS_MODEL: 'tubegen_el_model',
-    FAL_API_KEY: 'tubegen_fal_key'
+    FAL_API_KEY: 'tubegen_fal_key',  // PixVerse 영상 변환용
+    IMAGE_MODEL: 'tubegen_image_model',
+    // Gemini 전용 화풍 설정
+    GEMINI_STYLE: 'tubegen_gemini_style',
+    GEMINI_CUSTOM_STYLE: 'tubegen_gemini_custom_style',
+    PROJECTS: 'tubegen_projects'
   },
 
   // 애니메이션 설정

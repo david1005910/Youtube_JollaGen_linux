@@ -1,4 +1,20 @@
 
+// 참조 이미지 타입 (캐릭터/스타일 분리 + 강도 조절)
+export interface ReferenceImages {
+  character: string[];      // 캐릭터 참조 이미지 (최대 2장) - 캐릭터 외모/스타일 참조
+  style: string[];          // 스타일 참조 이미지 (최대 2장) - 화풍/분위기 참조
+  characterStrength: number; // 캐릭터 참조 강도 (0~100, 기본 70)
+  styleStrength: number;     // 스타일 참조 강도 (0~100, 기본 70)
+}
+
+// 기본 참조 이미지 설정
+export const DEFAULT_REFERENCE_IMAGES: ReferenceImages = {
+  character: [],
+  style: [],
+  characterStrength: 70,
+  styleStrength: 70
+};
+
 export interface SceneAnalysis {
   composition_type: 'MICRO' | 'STANDARD' | 'MACRO';
   composition_explanation: string; // 구도_설명
@@ -101,4 +117,53 @@ export enum GenerationStep {
   ASSETS = 'ASSETS',
   COMPLETED = 'COMPLETED',
   ERROR = 'ERROR'
+}
+
+// 비용 추적
+export interface CostBreakdown {
+  images: number;      // 이미지 생성 비용
+  tts: number;         // TTS 비용
+  videos: number;      // 영상 생성 비용
+  total: number;       // 총 비용
+  imageCount: number;  // 생성된 이미지 수
+  ttsCharacters: number; // TTS 글자 수
+  videoCount: number;  // 생성된 영상 수
+}
+
+// 프로젝트 설정 저장용 타입
+export interface ProjectSettings {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+
+  // 이미지 모델 설정
+  imageModel: string;
+
+  // TTS 설정
+  elevenLabsVoiceId: string;
+  elevenLabsModel: string;
+}
+
+// 생성된 콘텐츠 포함 저장 프로젝트
+export interface SavedProject {
+  id: string;
+  name: string;
+  createdAt: number;
+  topic: string;  // 생성 키워드/주제
+
+  // 설정
+  settings: {
+    imageModel: string;
+    elevenLabsModel: string;
+  };
+
+  // 생성된 콘텐츠 (전체 에셋 저장)
+  assets: GeneratedAsset[];
+
+  // 썸네일 (첫 번째 이미지 축소)
+  thumbnail: string | null;
+
+  // 비용 정보 (선택적 - 이전 버전 호환)
+  cost?: CostBreakdown;
 }
