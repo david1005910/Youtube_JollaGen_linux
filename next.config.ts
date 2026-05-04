@@ -1,14 +1,12 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // API 라우트 body 크기 제한 (참조 이미지 전송용)
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb',
     },
   },
-  // @remotion/bundler와 @remotion/renderer는 자체 webpack을 사용하므로
-  // Next.js 번들링에서 제외 (serverComponentsExternalPackages 대신 serverExternalPackages 사용)
+  // 서버 번들에서 무거운 네이티브 패키지 제외
   serverExternalPackages: [
     '@remotion/bundler',
     '@remotion/renderer',
@@ -16,6 +14,21 @@ const nextConfig: NextConfig = {
     'puppeteer-core',
     'esbuild',
   ],
+  // Remotion ESM 패키지를 Next.js webpack이 직접 트랜스파일
+  transpilePackages: [
+    'remotion',
+    '@remotion/player',
+    '@remotion/core',
+  ],
+  webpack(config: any) {
+    // .mjs 파일을 ES module로 처리
+    config.module.rules.push({
+      test: /node_modules\/(remotion|@remotion)\/.*\.mjs$/,
+      type: 'javascript/auto',
+      resolve: { fullySpecified: false },
+    });
+    return config;
+  },
 };
 
 export default nextConfig;

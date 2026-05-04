@@ -169,6 +169,68 @@ export async function POST(req: NextRequest) {
           return;
         }
 
+        // ── OpenAI ──────────────────────────────────────────────────────────
+        if (preferredModel === 'openai') {
+          console.log('[Chat] OpenAI 모드 선택');
+          const openaiKey = process.env.OPENAI_API_KEY;
+          if (!openaiKey) {
+            controller.enqueue(enc.encode(`data: ${JSON.stringify({ error: 'OPENAI_API_KEY가 설정되지 않았습니다. ⚙️ 설정에서 키를 입력하세요.' })}\n\n`));
+            controller.close();
+            return;
+          }
+          try {
+            const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${openaiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o',
+                stream: true,
+                messages: [
+                  { role: 'system', content: SYSTEM_INSTRUCTION },
+                  ...claudeMessages,
+                ],
+                max_tokens: 8192,
+              }),
+            });
+            if (!openaiRes.ok) {
+              const errText = await openaiRes.text();
+              controller.enqueue(enc.encode(`data: ${JSON.stringify({ error: `OpenAI 오류: ${openaiRes.status} ${errText.slice(0, 200)}` })}\n\n`));
+              controller.close();
+              return;
+            }
+            const reader = openaiRes.body!.getReader();
+            const dec = new TextDecoder();
+            let buf = '';
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buf += dec.decode(value, { stream: true });
+              const lines = buf.split('\n');
+              buf = lines.pop() ?? '';
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed === 'data: [DONE]') continue;
+                if (trimmed.startsWith('data: ')) {
+                  try {
+                    const json = JSON.parse(trimmed.slice(6));
+                    const text = json.choices?.[0]?.delta?.content;
+                    if (text) controller.enqueue(enc.encode(`data: ${JSON.stringify({ text })}\n\n`));
+                  } catch {}
+                }
+              }
+            }
+            controller.enqueue(enc.encode('data: [DONE]\n\n'));
+          } catch (err: any) {
+            controller.enqueue(enc.encode(`data: ${JSON.stringify({ error: err.message ?? 'OpenAI 오류' })}\n\n`));
+          } finally {
+            controller.close();
+          }
+          return;
+        }
+
         // ── Claude 전용 (폴백 없음) ──
         const anthropicKey = process.env.ANTHROPIC_API_KEY;
         if (!anthropicKey) {

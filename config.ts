@@ -10,12 +10,12 @@ export const IMAGE_MODELS = [
   // ── Google Gemini ───────────────────────────────────────────────────────
   {
     id: 'gemini-2.0-flash-image',
-    name: 'Gemini Flash Image (무료)',
+    name: 'Gemini 2.5 Flash Image (무료)',
     provider: 'Google',
     pricePerImage: 0,
-    description: '무료, 참조 이미지 지원, 빠른 생성, 권장',
+    description: '무료, 빠른 생성, 권장',
     speed: '빠름',
-    apiModelId: 'gemini-2.0-flash-exp-image-generation',
+    apiModelId: 'gemini-2.5-flash-image',
     tier: 'free',
   },
   // ── fal.ai — Google Imagen ─────────────────────────────────────────────
@@ -70,6 +70,17 @@ export const IMAGE_MODELS = [
     apiModelId: 'fal-ai/flux/dev',
     tier: 'paid',
   },
+  // ── fal.ai — Google Nano Banana 2 ─────────────────────────────────────
+  {
+    id: 'fal-nano-banana-2',
+    name: 'Nano Banana 2 (fal.ai)',
+    provider: 'fal.ai',
+    pricePerImage: 0.08,
+    description: 'Google Gemini 3.1 Flash Image 기반, 세밀한 텍스트·로고 렌더링',
+    speed: '빠름',
+    apiModelId: 'fal-ai/nano-banana-2',
+    tier: 'paid',
+  },
 ] as const;
 
 export type ImageModelId = typeof IMAGE_MODELS[number]['id'];
@@ -119,6 +130,7 @@ export const PRICING = {
     'fal-imagen-4': 0.06,
     'fal-flux-dev': 0.025,
     'fal-flux-schnell': 0.003,
+    'fal-nano-banana-2': 0.08,
   },
   // TTS (ElevenLabs) - 글자당 가격
   TTS: {

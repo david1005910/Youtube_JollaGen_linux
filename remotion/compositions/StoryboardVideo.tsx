@@ -3,8 +3,9 @@ import { AbsoluteFill, Sequence, useVideoConfig } from 'remotion';
 import { SceneComp } from './SceneComp';
 import type { RemotionVideoProps } from '../types';
 
-export function StoryboardVideo({ scenes }: RemotionVideoProps) {
+export function StoryboardVideo({ scenes, subtitleStyle }: RemotionVideoProps) {
   const { fps } = useVideoConfig();
+  void fps;
 
   let offset = 0;
   return (
@@ -14,7 +15,7 @@ export function StoryboardVideo({ scenes }: RemotionVideoProps) {
         offset += scene.durationInFrames;
         return (
           <Sequence key={i} from={from} durationInFrames={scene.durationInFrames}>
-            <SceneComp scene={scene} />
+            <SceneComp scene={scene} subtitleStyle={subtitleStyle} />
           </Sequence>
         );
       })}

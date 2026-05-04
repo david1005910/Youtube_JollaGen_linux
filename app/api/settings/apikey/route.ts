@@ -50,11 +50,14 @@ export async function GET() {
   const env = readEnvFile();
   const anthropicKey = env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '';
   const geminiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+  const openaiKey = env.OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
   return Response.json({
     hasAnthropicKey:    Boolean(anthropicKey),
     anthropicKeyMasked: anthropicKey ? maskKey(anthropicKey) : '',
     hasGeminiKey:       Boolean(geminiKey),
     geminiKeyMasked:    geminiKey ? maskKey(geminiKey) : '',
+    hasOpenaiKey:       Boolean(openaiKey),
+    openaiKeyMasked:    openaiKey ? maskKey(openaiKey) : '',
   });
 }
 
@@ -80,6 +83,15 @@ export async function POST(req: NextRequest) {
       }
       updates.GEMINI_API_KEY = key;
       process.env.GEMINI_API_KEY = key;
+    }
+
+    if (body.openaiKey !== undefined) {
+      const key = String(body.openaiKey).trim();
+      if (key && !key.startsWith('sk-')) {
+        return Response.json({ error: 'OpenAI API 키는 "sk-"로 시작해야 합니다.' }, { status: 400 });
+      }
+      updates.OPENAI_API_KEY = key;
+      process.env.OPENAI_API_KEY = key;
     }
 
     if (Object.keys(updates).length === 0) {

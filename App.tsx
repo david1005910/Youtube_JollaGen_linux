@@ -5,6 +5,10 @@ import { ScriptScene } from './types';
 import YouTubeSkillChat from './components/YouTubeSkillChat';
 import YouTubeClipperChat from './components/YouTubeClipperChat';
 import { RemotionPreview, type UploadedMedia } from './components/RemotionPreview';
+import dynamic from 'next/dynamic';
+const VideoEditor = dynamic(() => import('./components/VideoEditor'), { ssr: false });
+const GraphicModule = dynamic(() => import('./components/GraphicModule'), { ssr: false });
+const ScriptViewer = dynamic(() => import('./components/ScriptViewer'), { ssr: false });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Message {
@@ -192,10 +196,13 @@ export default function App() {
   ]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [aiModel, setAiModel] = useState<'claude' | 'gemini'>('claude');
+  const [aiModel, setAiModel] = useState<'claude' | 'gemini' | 'openai'>('claude');
   const [showYoutubeSkills, setShowYoutubeSkills] = useState(false);
   const [showClipper, setShowClipper] = useState(false);
   const [showMedia, setShowMedia] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
+  const [showGraphicModule, setShowGraphicModule] = useState(false);
+  const [showScriptViewer, setShowScriptViewer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [uploadedMedia, setUploadedMedia] = useState<UploadedMedia>({ images: [], video: null });
   const [secPerScene, setSecPerScene] = useState(5);
@@ -204,15 +211,17 @@ export default function App() {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [settingsAnthropicKey, setSettingsAnthropicKey] = useState('');
   const [settingsGeminiKey, setSettingsGeminiKey] = useState('');
+  const [settingsOpenaiKey, setSettingsOpenaiKey] = useState('');
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState('');
-  const [keyStatus, setKeyStatus] = useState<{ anthropicKeyMasked?: string; geminiKeyMasked?: string } | null>(null);
+  const [keyStatus, setKeyStatus] = useState<{ anthropicKeyMasked?: string; geminiKeyMasked?: string; openaiKeyMasked?: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const openSettings = async () => {
     setSettingsAnthropicKey('');
     setSettingsGeminiKey('');
+    setSettingsOpenaiKey('');
     setSettingsMsg('');
     setShowSettings(true);
     try {
@@ -229,6 +238,7 @@ export default function App() {
       const body: Record<string, string> = {};
       if (settingsAnthropicKey.trim()) body.anthropicKey = settingsAnthropicKey.trim();
       if (settingsGeminiKey.trim()) body.geminiKey = settingsGeminiKey.trim();
+      if (settingsOpenaiKey.trim()) body.openaiKey = settingsOpenaiKey.trim();
       if (Object.keys(body).length === 0) { setSettingsMsg('변경할 키를 입력하세요.'); return; }
       const res = await fetch('/api/settings/apikey', {
         method: 'POST',
@@ -240,6 +250,7 @@ export default function App() {
         setSettingsMsg('✅ 저장 완료! 즉시 적용됩니다.');
         setSettingsAnthropicKey('');
         setSettingsGeminiKey('');
+        setSettingsOpenaiKey('');
         const res2 = await fetch('/api/settings/apikey');
         setKeyStatus(await res2.json());
       } else {
@@ -253,15 +264,15 @@ export default function App() {
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem('tubegen_ai_model') as 'claude' | 'gemini' | null;
-    if (saved === 'claude' || saved === 'gemini') setAiModel(saved);
+    const saved = localStorage.getItem('tubegen_ai_model') as 'claude' | 'gemini' | 'openai' | null;
+    if (saved === 'claude' || saved === 'gemini' || saved === 'openai') setAiModel(saved);
   }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const switchModel = (model: 'claude' | 'gemini') => {
+  const switchModel = (model: 'claude' | 'gemini' | 'openai') => {
     setAiModel(model);
     localStorage.setItem('tubegen_ai_model', model);
   };
@@ -368,7 +379,8 @@ export default function App() {
     setInput('');
   };
 
-  const modelLabel = aiModel === 'claude' ? 'Claude Sonnet 4.6' : 'Gemini 2.0 Flash';
+  const modelLabel = aiModel === 'claude' ? 'Claude Sonnet 4.6' : aiModel === 'gemini' ? 'Gemini 2.0 Flash' : 'GPT-4o';
+  const modelDotColor = aiModel === 'claude' ? '#c96442' : aiModel === 'gemini' ? '#4285F4' : '#10A37F';
 
   // 채팅에서 가장 최근 생성된 씬 목록
   const latestScenes = [...messages].reverse().find(m => m.scenes && m.scenes.length > 0)?.scenes ?? [];
@@ -399,7 +411,7 @@ export default function App() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 13, fontWeight: 700, color: '#fff',
           }}>T</div>
-          <span style={{ fontWeight: 700, fontSize: 14, color: '#e0d5ca', letterSpacing: '-0.2px' }}>TubeGen AI</span>
+          <span style={{ fontWeight: 700, fontSize: 14, color: '#e0d5ca', letterSpacing: '-0.2px' }}>YoutubeGenAI</span>
         </div>
 
         {/* 가운데: 모델명 */}
@@ -408,7 +420,7 @@ export default function App() {
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
           <button
-            onClick={() => switchModel(aiModel === 'claude' ? 'gemini' : 'claude')}
+            onClick={() => switchModel(aiModel === 'claude' ? 'gemini' : aiModel === 'gemini' ? 'openai' : 'claude')}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '5px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500,
@@ -418,7 +430,7 @@ export default function App() {
           >
             <span style={{
               width: 7, height: 7, borderRadius: '50%',
-              background: aiModel === 'claude' ? '#c96442' : '#4285F4',
+              background: modelDotColor,
               display: 'inline-block', flexShrink: 0,
             }} />
             {modelLabel}
@@ -430,6 +442,39 @@ export default function App() {
 
         {/* 오른쪽: 툴 버튼들 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={() => setShowScriptViewer(true)}
+            disabled={latestScenes.length === 0}
+            style={{
+              ...headerBtnStyle('#86efac', 'rgba(134,239,172,0.10)'),
+              padding: '5px 11px', width: 'auto', fontSize: 12, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 4,
+              opacity: latestScenes.length === 0 ? 0.35 : 1,
+            }}
+            title={latestScenes.length === 0 ? '스크립트를 먼저 생성하세요' : `스크립트 ${latestScenes.length}씬 보기`}
+          >
+            📋 스크립트
+            {latestScenes.length > 0 && (
+              <span style={{
+                fontSize: 10, background: 'rgba(134,239,172,0.20)',
+                padding: '1px 5px', borderRadius: 4, color: '#86efac',
+              }}>{latestScenes.length}</span>
+            )}
+          </button>
+          <button onClick={() => setShowGraphicModule(true)} style={{
+            ...headerBtnStyle('#f59e0b', 'rgba(245,158,11,0.10)'),
+            padding: '5px 11px', width: 'auto', fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}>
+            🎨 그래픽
+          </button>
+          <button onClick={() => setShowEditor(true)} style={{
+            ...headerBtnStyle('#a78bfa', 'rgba(167,139,250,0.10)'),
+            padding: '5px 11px', width: 'auto', fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}>
+            ✂️ 편집기
+          </button>
           <button onClick={() => { setShowMedia(true); setShowPlayer(false); }} style={{
             ...headerBtnStyle('#22c55e', 'rgba(34,197,94,0.10)'),
             position: 'relative',
@@ -465,6 +510,30 @@ export default function App() {
       {/* ── 모달들 ── */}
       {showYoutubeSkills && <YouTubeSkillChat onClose={() => setShowYoutubeSkills(false)} />}
       {showClipper && <YouTubeClipperChat onClose={() => setShowClipper(false)} />}
+      {showGraphicModule && (
+        <GraphicModule
+          initialScenes={latestScenes}
+          onClose={() => setShowGraphicModule(false)}
+          onSendToEditor={scenes => {
+            setShowGraphicModule(false);
+            setShowEditor(true);
+          }}
+        />
+      )}
+      {showScriptViewer && (
+        <ScriptViewer
+          scenes={latestScenes}
+          onClose={() => setShowScriptViewer(false)}
+        />
+      )}
+      {showEditor && (
+        <VideoEditor
+          initialScenes={latestScenes}
+          initialImages={uploadedMedia.images}
+          initialVideo={uploadedMedia.video}
+          onClose={() => setShowEditor(false)}
+        />
+      )}
 
       {/* ── 설정 모달 ── */}
       {showSettings && (
@@ -490,7 +559,7 @@ export default function App() {
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 4 }}>console.anthropic.com에서 발급 · 크레딧 충전 필요</div>
             </div>
 
-            <div style={{ marginBottom: 22 }}>
+            <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 7, display: 'flex', justifyContent: 'space-between' }}>
                 <span>Gemini (Google) API Key</span>
                 {keyStatus?.geminiKeyMasked && <span style={{ color: '#4285F4' }}>현재: {keyStatus.geminiKeyMasked}</span>}
@@ -499,6 +568,17 @@ export default function App() {
                 onChange={e => setSettingsGeminiKey(e.target.value)}
                 style={{ width: '100%', padding: '10px 13px', borderRadius: 9, fontSize: 13, background: '#1c1917', border: '1px solid rgba(255,255,255,0.12)', color: '#e0d5ca', outline: 'none', boxSizing: 'border-box' }} />
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 4 }}>aistudio.google.com에서 발급 · 무료 티어 제공</div>
+            </div>
+
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 7, display: 'flex', justifyContent: 'space-between' }}>
+                <span>OpenAI API Key</span>
+                {keyStatus?.openaiKeyMasked && <span style={{ color: '#10A37F' }}>현재: {keyStatus.openaiKeyMasked}</span>}
+              </div>
+              <input type="password" placeholder="sk-..." value={settingsOpenaiKey}
+                onChange={e => setSettingsOpenaiKey(e.target.value)}
+                style={{ width: '100%', padding: '10px 13px', borderRadius: 9, fontSize: 13, background: '#1c1917', border: '1px solid rgba(255,255,255,0.12)', color: '#e0d5ca', outline: 'none', boxSizing: 'border-box' }} />
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 4 }}>platform.openai.com에서 발급 · GPT-4o 사용 (유료)</div>
             </div>
 
             {settingsMsg && (
@@ -708,7 +788,7 @@ export default function App() {
                   <ClaudeAvatar />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#c8b8a2', marginBottom: 8 }}>
-                      {aiModel === 'claude' ? 'Claude' : 'Gemini'}
+                      {aiModel === 'claude' ? 'Claude' : aiModel === 'gemini' ? 'Gemini' : 'GPT-4o'}
                     </div>
                     <div style={{ fontSize: 14.5, lineHeight: 1.78, color: '#d8cfc5' }}>
                       {renderContent(msg.content)}
@@ -786,6 +866,15 @@ export default function App() {
                     color: aiModel === 'gemini' ? '#80a8f0' : 'rgba(255,255,255,0.35)',
                   }}
                 >Gemini</button>
+                <button
+                  onClick={() => switchModel('openai')}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6, fontSize: 11.5, fontWeight: 500,
+                    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                    background: aiModel === 'openai' ? 'rgba(16,163,127,0.20)' : 'transparent',
+                    color: aiModel === 'openai' ? '#5bc8a8' : 'rgba(255,255,255,0.35)',
+                  }}
+                >GPT-4o</button>
               </div>
 
               {/* 전송 버튼 */}
