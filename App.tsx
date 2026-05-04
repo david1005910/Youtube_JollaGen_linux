@@ -4,11 +4,13 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ScriptScene } from './types';
 import YouTubeSkillChat from './components/YouTubeSkillChat';
 import YouTubeClipperChat from './components/YouTubeClipperChat';
+import CsvGenChat from './components/CsvGenChat';
 import { RemotionPreview, type UploadedMedia } from './components/RemotionPreview';
 import dynamic from 'next/dynamic';
 const VideoEditor = dynamic(() => import('./components/VideoEditor'), { ssr: false });
 const GraphicModule = dynamic(() => import('./components/GraphicModule'), { ssr: false });
 const ScriptViewer = dynamic(() => import('./components/ScriptViewer'), { ssr: false });
+const VideoWorkflow = dynamic(() => import('./components/VideoWorkflow'), { ssr: false });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Message {
@@ -166,15 +168,23 @@ const btnStyle: React.CSSProperties = {
 };
 
 // ─── Welcome ─────────────────────────────────────────────────────────────────
-const WELCOME = `안녕하세요! YouTube 스크립트 & 자막 생성 AI입니다.
+const WELCOME = `안녕하세요! **[AI돈나] 대본 + 이미지 프롬프트 생성 AI**입니다.
 
-원하는 주제를 입력하면 씬별 자막과 이미지 프롬프트를 바로 생성해 드립니다.
+마스터 캐릭터 이미지와 대본을 입력하면 영상 전체에서 **일관된 화풍**을 유지하며 씬별 이미지 프롬프트를 생성합니다.
 
-**예시:**
-• "코로나 사태가 경제에 미친 영향 10씬 스크립트"
-• "비트코인 전망 유튜브 영상 대본 만들어줘"
-• "AI가 바꾸는 미래 — 나레이션 8개 씬"
-• "삼성전자 실적 발표 뉴스 영상 자막"`;
+**사용 순서:**
+1. **마스터 캐릭터 이미지** 또는 화풍 설명을 먼저 입력
+2. **대본 전체**를 붙여넣기 (빈 줄로 문단 구분)
+3. AI가 화풍 키워드를 추출 후 확인 → 10장면씩 순서대로 생성
+
+**핵심 규칙:**
+• 1문단 = 1장면 (분할 절대 금지)
+• 원본 대본 텍스트 수정·번역 없이 그대로 사용
+• 마스터 캐릭터와 조연 인물 명확히 구분
+• 모든 프롬프트에 텍스트 렌더링 방지 구문 자동 포함
+• 10장면 단위로 출력 → "다음" 입력 시 이어서 생성
+
+생성된 JSON은 **📋 스크립트** 버튼에서 확인·편집 후 이미지 생성에 바로 사용할 수 있습니다.`;
 
 // ─── Claude-style Avatar ─────────────────────────────────────────────────────
 function ClaudeAvatar() {
@@ -199,10 +209,12 @@ export default function App() {
   const [aiModel, setAiModel] = useState<'claude' | 'gemini' | 'openai'>('claude');
   const [showYoutubeSkills, setShowYoutubeSkills] = useState(false);
   const [showClipper, setShowClipper] = useState(false);
+  const [showCsvGen, setShowCsvGen] = useState(false);
   const [showMedia, setShowMedia] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [showGraphicModule, setShowGraphicModule] = useState(false);
   const [showScriptViewer, setShowScriptViewer] = useState(false);
+  const [showVideoWorkflow, setShowVideoWorkflow] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [uploadedMedia, setUploadedMedia] = useState<UploadedMedia>({ images: [], video: null });
   const [secPerScene, setSecPerScene] = useState(5);
@@ -468,6 +480,13 @@ export default function App() {
           }}>
             🎨 그래픽
           </button>
+          <button onClick={() => setShowVideoWorkflow(true)} style={{
+            ...headerBtnStyle('#22d3ee', 'rgba(34,211,238,0.10)'),
+            padding: '5px 11px', width: 'auto', fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}>
+            🎞 영상편집
+          </button>
           <button onClick={() => setShowEditor(true)} style={{
             ...headerBtnStyle('#a78bfa', 'rgba(167,139,250,0.10)'),
             padding: '5px 11px', width: 'auto', fontSize: 12, fontWeight: 600,
@@ -493,6 +512,42 @@ export default function App() {
           <button onClick={() => setShowClipper(true)} style={headerBtnStyle('#eab308', 'rgba(234,179,8,0.10)')}>
             ✂️
           </button>
+          <button onClick={() => setShowCsvGen(true)} style={{
+            ...headerBtnStyle('#22c55e', 'rgba(34,197,94,0.10)'),
+            padding: '5px 11px', width: 'auto', fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}>
+            📊 CSV
+          </button>
+          {/* 외부 사이트 바로가기 */}
+          <a
+            href="https://claude.ai/project/019df143-69ba-7215-8d8d-6cb3f7917ff9"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Claude CSV 생성 프로젝트"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '5px 11px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+              background: 'rgba(201,100,66,0.12)', border: '1px solid rgba(201,100,66,0.30)',
+              color: '#e09070', textDecoration: 'none', cursor: 'pointer',
+            }}
+          >
+            📋 CSV사이트
+          </a>
+          <a
+            href="https://gemini.google.com/gem/c863da07b97e"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Gemini 대본 생성 사이트"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '5px 11px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+              background: 'rgba(66,133,244,0.12)', border: '1px solid rgba(66,133,244,0.30)',
+              color: '#80a8f0', textDecoration: 'none', cursor: 'pointer',
+            }}
+          >
+            ✨ 대본사이트
+          </a>
           <button onClick={clearChat} style={{
             padding: '5px 11px', borderRadius: 7, fontSize: 12,
             background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
@@ -510,6 +565,7 @@ export default function App() {
       {/* ── 모달들 ── */}
       {showYoutubeSkills && <YouTubeSkillChat onClose={() => setShowYoutubeSkills(false)} />}
       {showClipper && <YouTubeClipperChat onClose={() => setShowClipper(false)} />}
+      {showCsvGen && <CsvGenChat onClose={() => setShowCsvGen(false)} />}
       {showGraphicModule && (
         <GraphicModule
           initialScenes={latestScenes}
@@ -525,6 +581,9 @@ export default function App() {
           scenes={latestScenes}
           onClose={() => setShowScriptViewer(false)}
         />
+      )}
+      {showVideoWorkflow && (
+        <VideoWorkflow onClose={() => setShowVideoWorkflow(false)} />
       )}
       {showEditor && (
         <VideoEditor
