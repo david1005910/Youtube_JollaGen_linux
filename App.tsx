@@ -548,6 +548,20 @@ export default function App() {
           >
             ✨ 대본사이트
           </a>
+          <a
+            href="https://gemini.google.com/gem/c8c190a3a2f2"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="AI 영화 프롬프트 메이커"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '5px 11px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+              background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.30)',
+              color: '#c084fc', textDecoration: 'none', cursor: 'pointer',
+            }}
+          >
+            🎬 영화프롬프트
+          </a>
           <button onClick={clearChat} style={{
             padding: '5px 11px', borderRadius: 7, fontSize: 12,
             background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
