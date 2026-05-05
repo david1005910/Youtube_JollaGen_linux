@@ -5,6 +5,7 @@ import { ScriptScene } from './types';
 import YouTubeSkillChat from './components/YouTubeSkillChat';
 import YouTubeClipperChat from './components/YouTubeClipperChat';
 import CsvGenChat from './components/CsvGenChat';
+import MaterialFinder from './components/MaterialFinder';
 import { RemotionPreview, type UploadedMedia } from './components/RemotionPreview';
 import dynamic from 'next/dynamic';
 const VideoEditor = dynamic(() => import('./components/VideoEditor'), { ssr: false });
@@ -210,6 +211,7 @@ export default function App() {
   const [showYoutubeSkills, setShowYoutubeSkills] = useState(false);
   const [showClipper, setShowClipper] = useState(false);
   const [showCsvGen, setShowCsvGen] = useState(false);
+  const [showMaterialFinder, setShowMaterialFinder] = useState(false);
   const [showMedia, setShowMedia] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [showGraphicModule, setShowGraphicModule] = useState(false);
@@ -506,6 +508,13 @@ export default function App() {
               }} />
             )}
           </button>
+          <button onClick={() => setShowMaterialFinder(true)} style={{
+            ...headerBtnStyle('#fbbf24', 'rgba(251,191,36,0.10)'),
+            padding: '5px 11px', width: 'auto', fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}>
+            🔍 소재찾기
+          </button>
           <button onClick={() => setShowYoutubeSkills(true)} style={headerBtnStyle('#ef4444', 'rgba(239,68,68,0.12)')}>
             📺
           </button>
@@ -580,6 +589,15 @@ export default function App() {
       {showYoutubeSkills && <YouTubeSkillChat onClose={() => setShowYoutubeSkills(false)} />}
       {showClipper && <YouTubeClipperChat onClose={() => setShowClipper(false)} />}
       {showCsvGen && <CsvGenChat onClose={() => setShowCsvGen(false)} />}
+      {showMaterialFinder && (
+        <MaterialFinder
+          onClose={() => setShowMaterialFinder(false)}
+          onSelectTopic={(topic) => {
+            setInput(`"${topic}" 주제로 유튜브 대본과 이미지 프롬프트 만들어줘`);
+            setShowMaterialFinder(false);
+          }}
+        />
+      )}
       {showGraphicModule && (
         <GraphicModule
           initialScenes={latestScenes}
