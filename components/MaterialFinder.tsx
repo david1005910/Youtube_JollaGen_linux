@@ -116,7 +116,7 @@ export default function MaterialFinder({ onClose, onSelectTopic }: Props) {
           if (raw === '[DONE]') break;
           try {
             const { text, error } = JSON.parse(raw);
-            if (error) { full += `\n오류: ${error}`; }
+            if (error) { full += `\n⚠️ ${error}`; setResult(full); }
             else if (text) { full += text; setResult(full); }
           } catch {}
         }

@@ -79,20 +79,31 @@ export async function POST(req: NextRequest) {
             if (!anthropicKey) {
               await streamGemini(ctrl, enc, prompt);
             } else {
-              const client = new Anthropic({ apiKey: anthropicKey });
-              const stream = client.messages.stream({
-                model: 'claude-sonnet-4-6',
-                max_tokens: 4096,
-                system: SYSTEM,
-                messages: [{ role: 'user', content: prompt }],
-              });
-              for await (const event of stream) {
-                if (
-                  event.type === 'content_block_delta' &&
-                  event.delta.type === 'text_delta' &&
-                  event.delta.text
-                ) {
-                  ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`));
+              try {
+                const client = new Anthropic({ apiKey: anthropicKey });
+                const stream = client.messages.stream({
+                  model: 'claude-sonnet-4-6',
+                  max_tokens: 4096,
+                  system: SYSTEM,
+                  messages: [{ role: 'user', content: prompt }],
+                });
+                for await (const event of stream) {
+                  if (
+                    event.type === 'content_block_delta' &&
+                    event.delta.type === 'text_delta' &&
+                    event.delta.text
+                  ) {
+                    ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`));
+                  }
+                }
+              } catch (claudeErr: any) {
+                // Claude 크레딧 부족 등 실패 시 Gemini로 자동 폴백
+                const msg = claudeErr?.message ?? '';
+                if (msg.includes('credit') || msg.includes('billing') || msg.includes('quota') || msg.includes('400') || msg.includes('429')) {
+                  ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ text: '⚠️ Claude 크레딧 부족 → Gemini로 전환 중...\n\n' })}\n\n`));
+                  await streamGemini(ctrl, enc, prompt);
+                } else {
+                  throw claudeErr;
                 }
               }
             }
